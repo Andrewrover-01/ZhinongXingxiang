@@ -8,6 +8,7 @@ GET  /ai-doctor/records             list current user's diagnosis history
 GET  /ai-doctor/records/{id}        get single diagnosis record
 """
 
+from datetime import datetime
 from typing import Annotated, List
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -49,8 +50,6 @@ async def diagnose(
 
 class _RecordOut(DiagnoseResponse):
     """Extends DiagnoseResponse with timestamps for the list view."""
-
-    from datetime import datetime
 
     created_at: datetime  # type: ignore[assignment]
 

@@ -34,10 +34,10 @@ def _fallback_answer(query: str, sources: List[Dict[str, Any]]) -> str:
     """
     if not sources:
         return (
-            f"抱歉，暂未在知识库中检索到与"{query}"相关的内容。"
+            f"抱歉，暂未在知识库中检索到与\u201c{query}\u201d相关的内容。"
             "请尝试换一种描述方式或联系农业技术人员。"
         )
-    header = f"根据知识库检索到以下与"{query}"相关的信息：\n"
+    header = f"根据知识库检索到以下与\u201c{query}\u201d相关的信息：\n"
     body = _format_sources(sources)
     footer = "\n\n以上信息仅供参考，具体防治措施请结合实地情况判断。"
     return header + body + footer

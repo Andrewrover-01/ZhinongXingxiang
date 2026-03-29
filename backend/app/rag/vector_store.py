@@ -97,6 +97,11 @@ class VectorStore:
 
         if self.ephemeral:
             self._client = chromadb.EphemeralClient()
+            # Always start with a clean collection in ephemeral mode
+            try:
+                self._client.delete_collection(COLLECTION_NAME)
+            except Exception:
+                pass
         else:
             self._client = chromadb.PersistentClient(path=self.persist_dir)
 
@@ -158,6 +163,8 @@ class VectorStore:
             ChromaDB ``where`` filter dict, e.g. ``{"category": "policy"}``.
         """
         n = min(n_results, max(self._collection.count(), 1))
+        if self._collection.count() == 0:
+            return []
         kwargs: Dict[str, Any] = {
             "query_texts": [query_text],
             "n_results": n,
