@@ -12,6 +12,9 @@ const PRECACHE_URLS = [
   "/dashboard",
   "/farmland",
   "/manifest.webmanifest",
+  "/offline.html",
+  "/icons/icon-192.png",
+  "/icons/icon-512.png",
 ];
 
 // Install: precache app shell
