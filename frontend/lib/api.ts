@@ -116,3 +116,174 @@ export const farmlandApi = {
     apiClient.put<FarmlandResponse>(`/farmlands/${id}`, data).then((r) => r.data),
   delete: (id: string) => apiClient.delete(`/farmlands/${id}`),
 };
+
+// ─── Upload ──────────────────────────────────────────────────────────────────
+
+export interface UploadResponse {
+  url: string;
+  filename: string;
+  content_type: string;
+  size: number;
+}
+
+export const uploadApi = {
+  upload: (file: File): Promise<UploadResponse> => {
+    const form = new FormData();
+    form.append("file", file);
+    return apiClient
+      .post<UploadResponse>("/upload/image", form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+      .then((r) => r.data);
+  },
+};
+
+// ─── AI Doctor ───────────────────────────────────────────────────────────────
+
+export interface RAGSourceOut {
+  id: string;
+  title: string;
+  category: string;
+  snippet: string;
+  distance: number;
+}
+
+export interface DiagnoseRequest {
+  image_url: string;
+  description?: string;
+  crop_type?: string;
+  farmland_id?: string;
+}
+
+export interface DiagnoseResponse {
+  record_id: string;
+  diagnosis: string;
+  severity?: string;
+  confidence?: number;
+  treatment_plan: string;
+  medicine_suggest?: string;
+  sources: RAGSourceOut[];
+  llm_model: string;
+}
+
+export interface DiagnoseRecord extends DiagnoseResponse {
+  image_url: string;
+  description?: string;
+  crop_type?: string;
+  created_at: string;
+}
+
+export const aiDoctorApi = {
+  diagnose: (data: DiagnoseRequest) =>
+    apiClient.post<DiagnoseResponse>("/ai-doctor/diagnose", data).then((r) => r.data),
+  records: (skip = 0, limit = 20) =>
+    apiClient
+      .get<DiagnoseRecord[]>("/ai-doctor/records", { params: { skip, limit } })
+      .then((r) => r.data),
+  record: (id: string) =>
+    apiClient.get<DiagnoseRecord>(`/ai-doctor/records/${id}`).then((r) => r.data),
+};
+
+/** Open an SSE stream for AI Doctor streaming diagnosis. Returns a Reader. */
+export function streamDiagnose(
+  data: DiagnoseRequest,
+  token: string
+): ReadableStreamDefaultReader<Uint8Array> {
+  const ctrl = new AbortController();
+  const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+  const resp = fetch(`${base}/api/v1/ai-doctor/diagnose/stream`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+    signal: ctrl.signal,
+  });
+  // Return a reader-like wrapper by building a ReadableStream from the fetch
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      try {
+        const res = await resp;
+        const reader = res.body!.getReader();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          controller.enqueue(value);
+        }
+        controller.close();
+      } catch (e) {
+        controller.error(e);
+      }
+    },
+    cancel() {
+      ctrl.abort();
+    },
+  });
+  return stream.getReader();
+}
+
+// ─── Policy ──────────────────────────────────────────────────────────────────
+
+export interface PolicySessionSummary {
+  session_id: string;
+  message_count: number;
+  last_message: string;
+  last_at: string;
+}
+
+export interface PolicyMessage {
+  id: string;
+  session_id: string;
+  role: "user" | "assistant";
+  content: string;
+  rag_sources?: RAGSourceOut[];
+  created_at: string;
+}
+
+export const policyApi = {
+  sessions: () =>
+    apiClient.get<PolicySessionSummary[]>("/policy/sessions").then((r) => r.data),
+  sessionMessages: (sessionId: string) =>
+    apiClient.get<PolicyMessage[]>(`/policy/sessions/${sessionId}`).then((r) => r.data),
+  deleteSession: (sessionId: string) =>
+    apiClient.delete(`/policy/sessions/${sessionId}`),
+};
+
+/** Open an SSE stream for Policy chat. Returns a ReadableStreamDefaultReader. */
+export function streamPolicyChat(
+  sessionId: string,
+  message: string,
+  token: string
+): ReadableStreamDefaultReader<Uint8Array> {
+  const ctrl = new AbortController();
+  const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      try {
+        const res = await fetch(`${base}/api/v1/policy/chat`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ session_id: sessionId, message }),
+          signal: ctrl.signal,
+        });
+        const reader = res.body!.getReader();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          controller.enqueue(value);
+        }
+        controller.close();
+      } catch (e) {
+        controller.error(e);
+      }
+    },
+    cancel() {
+      ctrl.abort();
+    },
+  });
+  return stream.getReader();
+}
