@@ -8,6 +8,9 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./zhinong.db"
     REDIS_URL: str = "redis://localhost:6379/0"
 
+    # Cache TTL in seconds.  Default: 1 hour (3600 s) for RAG results.
+    CACHE_TTL: int = 3600
+
     SECRET_KEY: str = "dev-secret-key-change-in-production"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080  # 7 days

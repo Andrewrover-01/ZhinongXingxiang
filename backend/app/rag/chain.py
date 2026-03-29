@@ -1,6 +1,11 @@
 """
 Full RAG pipeline:
 retrieve (hybrid) → build prompt context → generate answer.
+
+Results from ``arun()`` are cached in Redis (TTL = ``settings.CACHE_TTL``,
+default 1 hour) so repeated identical queries skip retrieval and LLM
+inference.  Streaming responses (``astream``) bypass the cache because
+partial chunks cannot be stored atomically.
 """
 
 from __future__ import annotations
@@ -8,6 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
+from app.core.cache import cache_get, cache_set, make_rag_cache_key
 from app.rag.llm import LLMClient, get_llm_client
 from app.rag.retriever import HybridRetriever
 from app.rag.vector_store import SearchResult, VectorStore, get_vector_store
@@ -43,6 +49,29 @@ def _result_to_dict(r: SearchResult) -> Dict[str, Any]:
     return {"document": r.document, "metadata": r.metadata}
 
 
+# ── Cache serialisation helpers ───────────────────────────────────────────────
+
+def _rag_result_to_dict(result: RAGResult) -> Dict[str, Any]:
+    return {
+        "answer": result.answer,
+        "sources": [
+            {
+                "id": s.id,
+                "title": s.title,
+                "category": s.category,
+                "snippet": s.snippet,
+                "distance": s.distance,
+            }
+            for s in result.sources
+        ],
+    }
+
+
+def _dict_to_rag_result(data: Dict[str, Any]) -> RAGResult:
+    sources = [RAGSource(**s) for s in data.get("sources", [])]
+    return RAGResult(answer=data["answer"], sources=sources)
+
+
 class RAGChain:
     """
     Full RAG chain wiring together retrieval and generation.
@@ -57,6 +86,9 @@ class RAGChain:
         Semantic candidate pool size fed to the hybrid retriever.
     n_results:
         Final number of documents used as LLM context.
+    enable_cache:
+        When True (default), ``arun()`` results are cached in Redis.
+        Set to False in tests that don't need caching behaviour.
     """
 
     def __init__(
@@ -65,14 +97,16 @@ class RAGChain:
         llm_client: Optional[LLMClient] = None,
         n_semantic: int = 20,
         n_results: int = 5,
+        enable_cache: bool = True,
     ) -> None:
         self._vs = vector_store or get_vector_store()
         self._llm = llm_client or get_llm_client()
         self._retriever = HybridRetriever(
             self._vs, n_semantic=n_semantic, n_results=n_results
         )
+        self._enable_cache = enable_cache
 
-    # ── Non-streaming ─────────────────────────────────────────────────────────
+    # ── Non-streaming (with Redis cache) ──────────────────────────────────────
 
     async def arun(
         self,
@@ -80,17 +114,36 @@ class RAGChain:
         category_filter: Optional[str] = None,
         system_prompt: Optional[str] = None,
     ) -> RAGResult:
-        """Run the full RAG pipeline and return a complete answer."""
+        """Run the full RAG pipeline and return a complete answer.
+
+        The result is cached in Redis with a TTL of ``settings.CACHE_TTL``
+        (default 1 hour).  Cache misses fall through to the full pipeline.
+        """
+        cache_key = make_rag_cache_key(query, category_filter)
+
+        # ── Cache read ────────────────────────────────────────────────────────
+        if self._enable_cache:
+            cached = await cache_get(cache_key)
+            if cached is not None:
+                return _dict_to_rag_result(cached)
+
+        # ── Full pipeline ─────────────────────────────────────────────────────
         where = {"category": category_filter} if category_filter else None
         candidates = self._retriever.retrieve(query, where=where)
         source_dicts = [_result_to_dict(r) for r in candidates]
         answer = await self._llm.complete(query, source_dicts, system_prompt)
-        return RAGResult(
+        result = RAGResult(
             answer=answer,
             sources=[_to_rag_source(r) for r in candidates],
         )
 
-    # ── Streaming ─────────────────────────────────────────────────────────────
+        # ── Cache write ───────────────────────────────────────────────────────
+        if self._enable_cache:
+            await cache_set(cache_key, _rag_result_to_dict(result))
+
+        return result
+
+    # ── Streaming (cache not applied) ─────────────────────────────────────────
 
     async def astream(
         self,
