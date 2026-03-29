@@ -16,6 +16,8 @@ jobs:
   build-apk:
     name: Build Android APK
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # needed for uploading artifacts and creating GitHub Releases
 
     defaults:
       run:
