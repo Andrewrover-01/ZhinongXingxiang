@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { Sprout, LogOut, Home } from "lucide-react";
+import { Sprout, LogOut, Home, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const NAV_ITEMS = [
   { href: "/ai-doctor", label: "🩺 AI 医生" },
@@ -17,50 +19,118 @@ const NAV_ITEMS = [
 export function Nav() {
   const pathname = usePathname();
   const router = useRouter();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   function handleLogout() {
     if (typeof window !== "undefined") {
       localStorage.removeItem("access_token");
     }
     router.push("/login");
+    setMenuOpen(false);
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b bg-card shadow-sm">
-      <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
-        <Link href="/" className="flex items-center gap-2 font-bold text-primary shrink-0">
-          <Sprout className="h-5 w-5" />
-          <span className="hidden sm:inline">智农兴乡</span>
-        </Link>
-
-        <nav className="flex items-center gap-1 overflow-x-auto flex-1">
-          {NAV_ITEMS.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "whitespace-nowrap rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent",
-                pathname?.startsWith(item.href)
-                  ? "bg-accent font-medium text-accent-foreground"
-                  : "text-muted-foreground"
-              )}
-            >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
-
-        <div className="flex items-center gap-2 shrink-0">
-          <Link href="/">
-            <Button variant="ghost" size="icon" title="首页">
-              <Home className="h-4 w-4" />
-            </Button>
+    <>
+      <header className="sticky top-0 z-40 border-b bg-card shadow-sm">
+        <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-2.5">
+          {/* Logo */}
+          <Link href="/" className="flex items-center gap-2 font-bold text-primary shrink-0">
+            <Sprout className="h-5 w-5" />
+            <span className="hidden sm:inline text-base">智农兴乡</span>
           </Link>
-          <Button variant="ghost" size="icon" title="退出登录" onClick={handleLogout}>
-            <LogOut className="h-4 w-4" />
-          </Button>
+
+          {/* Desktop nav links */}
+          <nav className="hidden sm:flex items-center gap-1 overflow-x-auto flex-1">
+            {NAV_ITEMS.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "whitespace-nowrap rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent",
+                  pathname?.startsWith(item.href)
+                    ? "bg-accent font-medium text-accent-foreground"
+                    : "text-muted-foreground"
+                )}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+
+          {/* Spacer on mobile */}
+          <div className="flex-1 sm:hidden" />
+
+          {/* Right actions */}
+          <div className="flex items-center gap-1 shrink-0">
+            <ThemeToggle />
+            <Link href="/" className="hidden sm:block">
+              <Button variant="ghost" size="icon" title="首页">
+                <Home className="h-4 w-4" />
+              </Button>
+            </Link>
+            <Button
+              variant="ghost"
+              size="icon"
+              title="退出登录"
+              onClick={handleLogout}
+              className="hidden sm:flex"
+            >
+              <LogOut className="h-4 w-4" />
+            </Button>
+
+            {/* Mobile hamburger */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="sm:hidden"
+              onClick={() => setMenuOpen((v) => !v)}
+              title="菜单"
+            >
+              {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </Button>
+          </div>
         </div>
-      </div>
-    </header>
+
+        {/* Mobile drawer menu */}
+        {menuOpen && (
+          <div className="sm:hidden border-t bg-card">
+            <nav className="flex flex-col divide-y">
+              {NAV_ITEMS.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setMenuOpen(false)}
+                  className={cn(
+                    "flex items-center px-4 py-3 text-sm transition-colors",
+                    pathname?.startsWith(item.href)
+                      ? "bg-accent font-medium text-accent-foreground"
+                      : "text-foreground hover:bg-accent"
+                  )}
+                >
+                  {item.label}
+                </Link>
+              ))}
+              <div className="flex items-center justify-between px-4 py-3">
+                <Link
+                  href="/"
+                  onClick={() => setMenuOpen(false)}
+                  className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+                >
+                  <Home className="h-4 w-4" />
+                  首页
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-2 text-sm text-destructive hover:text-destructive/80"
+                >
+                  <LogOut className="h-4 w-4" />
+                  退出登录
+                </button>
+              </div>
+            </nav>
+          </div>
+        )}
+      </header>
+    </>
   );
 }
