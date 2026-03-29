@@ -12,6 +12,7 @@ from datetime import datetime
 from typing import Annotated, List
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sse_starlette.sse import EventSourceResponse
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -20,7 +21,7 @@ from app.models.user import User
 from app.rag.chain import RAGChain, get_rag_chain
 from app.routers.deps import get_current_user
 from app.schemas.rag import DiagnoseRequest, DiagnoseResponse
-from app.services.rag_service import run_diagnosis
+from app.services.rag_service import run_diagnosis, run_diagnosis_stream
 
 router = APIRouter(prefix="/ai-doctor", tags=["AI Doctor"])
 
@@ -44,6 +45,29 @@ async def diagnose(
     """
     result = await run_diagnosis(db, req, user_id=current_user.id, chain=chain)
     return DiagnoseResponse(**result)
+
+
+@router.post("/diagnose/stream")
+async def diagnose_stream(
+    req: DiagnoseRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    chain: RAGChain = Depends(get_rag_chain),
+):
+    """
+    Submit an image URL and optional description.
+    Returns a Server-Sent Events stream of the diagnosis text.
+    A final ``data: [DONE]`` event signals stream completion.
+    """
+
+    async def _event_generator():
+        async for chunk in run_diagnosis_stream(
+            db, req, user_id=current_user.id, chain=chain
+        ):
+            yield {"data": chunk}
+        yield {"data": "[DONE]"}
+
+    return EventSourceResponse(_event_generator())
 
 
 # ── History ───────────────────────────────────────────────────────────────────

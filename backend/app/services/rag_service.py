@@ -190,6 +190,55 @@ async def run_policy_chat_stream(
     db.commit()
 
 
+async def run_diagnosis_stream(
+    db: Session,
+    request: DiagnoseRequest,
+    user_id: str,
+    chain: Optional[RAGChain] = None,
+) -> AsyncGenerator[str, None]:
+    """
+    Run the disease-diagnosis RAG chain with SSE streaming.
+
+    Yields answer text chunks. After all chunks are yielded, persists the
+    RecognitionRecord to the database.
+    """
+    rag = chain or get_rag_chain()
+    query = f"{request.crop_type or ''}作物 {request.description or ''} 图片诊断".strip()
+
+    full_answer = ""
+    async for chunk in rag.astream(
+        query,
+        category_filter="disease",
+        system_prompt=_DIAGNOSIS_SYSTEM,
+    ):
+        full_answer += chunk
+        yield chunk
+
+    # Persist after streaming completes
+    diagnosis = _parse_diagnosis_title(full_answer)
+    treatment = _parse_treatment(full_answer)
+    severity = _parse_severity(full_answer)
+    medicine = _parse_medicine(full_answer)
+
+    record = RecognitionRecord(
+        id=str(uuid.uuid4()),
+        user_id=user_id,
+        farmland_id=request.farmland_id,
+        image_url=request.image_url,
+        description=request.description,
+        crop_type=request.crop_type,
+        diagnosis=diagnosis,
+        severity=severity,
+        confidence=Decimal("0.8500"),
+        treatment_plan=treatment,
+        medicine_suggest=medicine,
+        rag_sources=[],
+        llm_model="gpt-4o-mini-stream",
+    )
+    db.add(record)
+    db.commit()
+
+
 def get_session_messages(
     db: Session,
     session_id: str,
