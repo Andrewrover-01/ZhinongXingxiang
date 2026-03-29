@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     CORS_ORIGINS: list[str] = ["http://localhost:3000"]
 
     CHROMA_PERSIST_DIR: str = "./chroma_data"
+    CHROMA_EMBEDDING_BACKEND: str = "default"  # default | openai | mock
     OPENAI_API_KEY: Optional[str] = None
     QWEN_API_KEY: Optional[str] = None
 

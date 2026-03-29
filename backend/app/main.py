@@ -11,6 +11,9 @@ from app.routers.auth import router as auth_router
 from app.routers.farmland import router as farmland_router
 from app.routers.upload import router as upload_router
 from app.routers.users import router as users_router
+from app.routers.knowledge import router as knowledge_router
+from app.routers.ai_doctor import router as ai_doctor_router
+from app.routers.policy import router as policy_router
 
 
 @asynccontextmanager
@@ -41,6 +44,9 @@ app.include_router(auth_router, prefix="/api/v1")
 app.include_router(users_router, prefix="/api/v1")
 app.include_router(farmland_router, prefix="/api/v1")
 app.include_router(upload_router, prefix="/api/v1")
+app.include_router(knowledge_router, prefix="/api/v1")
+app.include_router(ai_doctor_router, prefix="/api/v1")
+app.include_router(policy_router, prefix="/api/v1")
 
 
 @app.get("/")
