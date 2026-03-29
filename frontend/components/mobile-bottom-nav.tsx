@@ -19,7 +19,10 @@ export function MobileBottomNav() {
   if (!pathname || authPaths.includes(pathname) || pathname === "/") return null;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 sm:hidden border-t bg-card shadow-lg safe-area-bottom">
+    <nav
+      className="fixed bottom-0 left-0 right-0 z-50 sm:hidden border-t bg-card shadow-lg safe-area-bottom"
+      aria-label="底部导航"
+    >
       <div className="flex">
         {BOTTOM_ITEMS.map((item) => {
           const active = pathname.startsWith(item.href);
@@ -27,6 +30,8 @@ export function MobileBottomNav() {
             <Link
               key={item.href}
               href={item.href}
+              aria-label={item.label}
+              aria-current={active ? "page" : undefined}
               className={cn(
                 "flex flex-1 flex-col items-center gap-0.5 py-2 text-center transition-colors",
                 active
@@ -34,7 +39,7 @@ export function MobileBottomNav() {
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
-              <span className="text-xl leading-none">{item.icon}</span>
+              <span className="text-xl leading-none" aria-hidden="true">{item.icon}</span>
               <span
                 className={cn(
                   "text-[10px] leading-tight",

@@ -17,13 +17,13 @@ export function ThemeToggle() {
     <Button
       variant="ghost"
       size="icon"
-      title={resolvedTheme === "dark" ? "切换亮色模式" : "切换暗色模式"}
+      aria-label={resolvedTheme === "dark" ? "切换到亮色模式" : "切换到暗色模式"}
       onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
     >
       {resolvedTheme === "dark" ? (
-        <Sun className="h-4 w-4" />
+        <Sun className="h-4 w-4" aria-hidden="true" />
       ) : (
-        <Moon className="h-4 w-4" />
+        <Moon className="h-4 w-4" aria-hidden="true" />
       )}
     </Button>
   );

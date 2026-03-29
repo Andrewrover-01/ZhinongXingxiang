@@ -35,16 +35,17 @@ export function Nav() {
         <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-2.5">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 font-bold text-primary shrink-0">
-            <Sprout className="h-5 w-5" />
+            <Sprout className="h-5 w-5" aria-hidden="true" />
             <span className="hidden sm:inline text-base">智农兴乡</span>
           </Link>
 
           {/* Desktop nav links */}
-          <nav className="hidden sm:flex items-center gap-1 overflow-x-auto flex-1">
+          <nav className="hidden sm:flex items-center gap-1 overflow-x-auto flex-1" aria-label="主导航">
             {NAV_ITEMS.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
+                aria-current={pathname?.startsWith(item.href) ? "page" : undefined}
                 className={cn(
                   "whitespace-nowrap rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent",
                   pathname?.startsWith(item.href)
@@ -64,18 +65,18 @@ export function Nav() {
           <div className="flex items-center gap-1 shrink-0">
             <ThemeToggle />
             <Link href="/" className="hidden sm:block">
-              <Button variant="ghost" size="icon" title="首页">
-                <Home className="h-4 w-4" />
+              <Button variant="ghost" size="icon" aria-label="返回首页">
+                <Home className="h-4 w-4" aria-hidden="true" />
               </Button>
             </Link>
             <Button
               variant="ghost"
               size="icon"
-              title="退出登录"
+              aria-label="退出登录"
               onClick={handleLogout}
               className="hidden sm:flex"
             >
-              <LogOut className="h-4 w-4" />
+              <LogOut className="h-4 w-4" aria-hidden="true" />
             </Button>
 
             {/* Mobile hamburger */}
@@ -84,22 +85,25 @@ export function Nav() {
               size="icon"
               className="sm:hidden"
               onClick={() => setMenuOpen((v) => !v)}
-              title="菜单"
+              aria-label={menuOpen ? "关闭菜单" : "打开菜单"}
+              aria-expanded={menuOpen}
+              aria-controls="mobile-menu"
             >
-              {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              {menuOpen ? <X className="h-5 w-5" aria-hidden="true" /> : <Menu className="h-5 w-5" aria-hidden="true" />}
             </Button>
           </div>
         </div>
 
         {/* Mobile drawer menu */}
         {menuOpen && (
-          <div className="sm:hidden border-t bg-card">
-            <nav className="flex flex-col divide-y">
+          <div id="mobile-menu" className="sm:hidden border-t bg-card">
+            <nav className="flex flex-col divide-y" aria-label="移动端导航">
               {NAV_ITEMS.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
                   onClick={() => setMenuOpen(false)}
+                  aria-current={pathname?.startsWith(item.href) ? "page" : undefined}
                   className={cn(
                     "flex items-center px-4 py-3 text-sm transition-colors",
                     pathname?.startsWith(item.href)
@@ -116,14 +120,14 @@ export function Nav() {
                   onClick={() => setMenuOpen(false)}
                   className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
                 >
-                  <Home className="h-4 w-4" />
+                  <Home className="h-4 w-4" aria-hidden="true" />
                   首页
                 </Link>
                 <button
                   onClick={handleLogout}
                   className="flex items-center gap-2 text-sm text-destructive hover:text-destructive/80"
                 >
-                  <LogOut className="h-4 w-4" />
+                  <LogOut className="h-4 w-4" aria-hidden="true" />
                   退出登录
                 </button>
               </div>
