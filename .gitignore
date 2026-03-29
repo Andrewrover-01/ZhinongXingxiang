@@ -169,3 +169,7 @@ frontend/ios/
 # Keystore files (never commit)
 *.jks
 *.keystore
+
+# Locust load test CSV output (generated artifacts)
+backend/load_test_results*.csv
+backend/.locust_client_id
