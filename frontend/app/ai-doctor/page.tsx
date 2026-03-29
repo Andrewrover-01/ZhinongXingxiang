@@ -27,7 +27,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Nav } from "@/components/nav";
 import { cn } from "@/lib/utils";
-import { captureImage, isNative } from "@/lib/camera";
+import { captureImage, isNative, checkCameraPermissions, requestCameraPermissions } from "@/lib/camera";
 
 // ── Severity helpers ──────────────────────────────────────────────────────────
 const SEVERITY_MAP: Record<string, { label: string; color: string; bars: number }> = {
@@ -269,7 +269,20 @@ export default function AiDoctorPage() {
   /** Called when the user taps the camera/upload area */
   const handleCameraClick = useCallback(async () => {
     if (isNative()) {
-      // On Android/iOS: open native camera or picker
+      // Check / request camera permission before opening the camera
+      const perm = await checkCameraPermissions();
+      if (perm === "denied") {
+        setError("摄像头权限已被拒绝，请在系统设置中开启后重试");
+        return;
+      }
+      if (perm === "prompt") {
+        const granted = await requestCameraPermissions();
+        if (granted !== "granted") {
+          setError("需要摄像头权限才能拍照");
+          return;
+        }
+      }
+      // On Android/iOS: open native camera
       const result = await captureImage("camera");
       if (result) {
         setPreviewUrl(result.previewUrl);
