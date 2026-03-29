@@ -137,3 +137,27 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.eggs/
+*.egg
+.coverage
+coverage.xml
+htmlcov/
+
+# SQLite databases (dev only)
+*.db
+
+# Uploaded files (dev only)
+backend/uploads/
+
+# Python virtual environments
+.venv/
+venv/
+env/
