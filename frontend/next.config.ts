@@ -1,5 +1,9 @@
 import type { NextConfig } from "next";
 
+// Set NEXT_PUBLIC_CAPACITOR=true when building the static export for Capacitor APK.
+// Normal Docker / server builds leave this unset and use `standalone` output.
+const isCapacitorBuild = process.env.NEXT_PUBLIC_CAPACITOR === "true";
+
 const SECURITY_HEADERS = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "SAMEORIGIN" },
@@ -12,8 +16,11 @@ const SECURITY_HEADERS = [
 ];
 
 const nextConfig: NextConfig = {
-  output: "standalone",
+  // `standalone` for Docker/server deployment; `export` for Capacitor APK
+  output: isCapacitorBuild ? "export" : "standalone",
   images: {
+    // Static export requires unoptimized images (no Next.js image server)
+    unoptimized: isCapacitorBuild,
     remotePatterns: [
       {
         protocol: "http",
@@ -22,14 +29,19 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  async headers() {
-    return [
-      {
-        source: "/(.*)",
-        headers: SECURITY_HEADERS,
-      },
-    ];
-  },
+  // Security headers are only applied in server mode (not static export)
+  ...(isCapacitorBuild
+    ? {}
+    : {
+        async headers() {
+          return [
+            {
+              source: "/(.*)",
+              headers: SECURITY_HEADERS,
+            },
+          ];
+        },
+      }),
 };
 
 export default nextConfig;

@@ -1,0 +1,138 @@
+name: Android APK Build
+
+on:
+  push:
+    branches: [main, "copilot/**"]
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "Build release APK (requires keystore secrets)"
+        required: false
+        default: "false"
+        type: boolean
+
+jobs:
+  build-apk:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      # ── Checkout ──────────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Java (required by Gradle) ─────────────────────────────────────────────
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      # ── Node ──────────────────────────────────────────────────────────────────
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # ── Android SDK ───────────────────────────────────────────────────────────
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android build tools
+        run: |
+          sdkmanager "platforms;android-34" "build-tools;34.0.0" --sdk_root=$ANDROID_HOME
+
+      # ── Install dependencies ──────────────────────────────────────────────────
+      - name: Install npm dependencies
+        run: npm ci --prefer-offline || npm install
+
+      # ── Build Next.js static export ──────────────────────────────────────────
+      - name: Build Next.js for Capacitor
+        run: npm run build:capacitor
+        env:
+          NEXT_PUBLIC_CAPACITOR: "true"
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL || 'https://api.zhinong.example.com' }}
+
+      # ── Initialize Android project (if not already present) ──────────────────
+      - name: Add Capacitor Android platform
+        run: |
+          if [ ! -d "android" ]; then
+            npx cap add android
+          fi
+
+      # ── Sync web assets into Android ─────────────────────────────────────────
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      # ── Build debug APK ───────────────────────────────────────────────────────
+      - name: Build debug APK
+        run: cd android && ./gradlew assembleDebug --no-daemon
+
+      # ── (Optional) Build release APK when keystore secrets are present ────────
+      - name: Decode keystore
+        if: >
+          (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+          (github.event_name == 'workflow_dispatch' && inputs.release == 'true')
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/zhinong-release.jks
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+
+      - name: Build release APK
+        if: >
+          (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+          (github.event_name == 'workflow_dispatch' && inputs.release == 'true')
+        run: |
+          cd android && ./gradlew assembleRelease --no-daemon \
+            -Pandroid.injected.signing.store.file=app/zhinong-release.jks \
+            -Pandroid.injected.signing.store.password="${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
+            -Pandroid.injected.signing.key.alias="${{ secrets.ANDROID_KEY_ALIAS }}" \
+            -Pandroid.injected.signing.key.password="${{ secrets.ANDROID_KEY_PASSWORD }}"
+
+      # ── Upload debug APK as artifact ─────────────────────────────────────────
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: zhinong-debug-apk
+          path: frontend/android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14
+
+      # ── Upload release APK as artifact (only on tags / manual release) ───────
+      - name: Upload release APK
+        if: >
+          (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+          (github.event_name == 'workflow_dispatch' && inputs.release == 'true')
+        uses: actions/upload-artifact@v4
+        with:
+          name: zhinong-release-apk
+          path: frontend/android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 90
+
+      # ── Create GitHub Release with APK on version tags ────────────────────────
+      - name: Create GitHub Release
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: frontend/android/app/build/outputs/apk/release/app-release.apk
+          name: "智农兴乡 ${{ github.ref_name }}"
+          body: |
+            ## 智农兴乡 Android APK ${{ github.ref_name }}
+
+            ### 安装说明
+            1. 在 Android 设备上开启「允许安装未知来源应用」
+            2. 下载 `app-release.apk` 并点击安装
+            3. 授予摄像头、网络、通知权限
+
+            ### 系统要求
+            - Android 10 (API 29) 及以上
+            - 存储空间 ≥ 50 MB
+          draft: false
+          prerelease: false

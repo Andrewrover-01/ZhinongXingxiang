@@ -27,6 +27,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Nav } from "@/components/nav";
 import { cn } from "@/lib/utils";
+import { captureImage, isNative } from "@/lib/camera";
 
 // ── Severity helpers ──────────────────────────────────────────────────────────
 const SEVERITY_MAP: Record<string, { label: string; color: string; bars: number }> = {
@@ -244,15 +245,11 @@ export default function AiDoctorPage() {
     enabled: tab === "history",
   });
 
-  const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    // Preview
-    setPreviewUrl(URL.createObjectURL(file));
+  const uploadFile = useCallback(async (file: Blob, filename = "image.jpg") => {
     setUploading(true);
     setError("");
     try {
-      const res = await uploadApi.upload(file);
+      const res = await uploadApi.upload(new File([file], filename, { type: file.type || "image/jpeg" }));
       setImageUrl(res.url);
     } catch {
       setError("图片上传失败，请重试");
@@ -260,6 +257,38 @@ export default function AiDoctorPage() {
       setUploading(false);
     }
   }, []);
+
+  const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Preview
+    setPreviewUrl(URL.createObjectURL(file));
+    await uploadFile(file, file.name);
+  }, [uploadFile]);
+
+  /** Called when the user taps the camera/upload area */
+  const handleCameraClick = useCallback(async () => {
+    if (isNative()) {
+      // On Android/iOS: open native camera or picker
+      const result = await captureImage("camera");
+      if (result) {
+        setPreviewUrl(result.previewUrl);
+        await uploadFile(result.blob, "capture.jpg");
+      }
+    } else {
+      // Browser: trigger the hidden file input
+      fileRef.current?.click();
+    }
+  }, [uploadFile]);
+
+  /** Native gallery picker — only shown in Capacitor */
+  const handleGalleryClick = useCallback(async () => {
+    const result = await captureImage("gallery");
+    if (result) {
+      setPreviewUrl(result.previewUrl);
+      await uploadFile(result.blob, "gallery.jpg");
+    }
+  }, [uploadFile]);
 
   const handleDrop = useCallback(
     (e: React.DragEvent<HTMLDivElement>) => {
@@ -383,9 +412,13 @@ export default function AiDoctorPage() {
                 "border-2 border-dashed rounded-xl flex flex-col items-center justify-center gap-3 p-8 cursor-pointer transition-colors hover:border-primary hover:bg-primary/5",
                 previewUrl ? "border-primary/40" : "border-muted-foreground/30"
               )}
-              onClick={() => fileRef.current?.click()}
+              onClick={handleCameraClick}
               onDrop={handleDrop}
               onDragOver={(e) => e.preventDefault()}
+              role="button"
+              aria-label="上传或拍摄病害图片"
+              tabIndex={0}
+              onKeyDown={(e) => e.key === "Enter" && handleCameraClick()}
             >
               {previewUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -397,11 +430,13 @@ export default function AiDoctorPage() {
               ) : (
                 <>
                   <div className="flex gap-4 text-muted-foreground">
-                    <Camera className="h-8 w-8" />
-                    <Upload className="h-8 w-8" />
+                    <Camera className="h-8 w-8" aria-hidden="true" />
+                    <Upload className="h-8 w-8" aria-hidden="true" />
                   </div>
                   <div className="text-center">
-                    <p className="font-medium text-sm">点击或拖拽上传图片</p>
+                    <p className="font-medium text-sm">
+                      {isNative() ? "点击拍照" : "点击或拖拽上传图片"}
+                    </p>
                     <p className="text-xs text-muted-foreground mt-1">
                       支持 JPG、PNG 格式
                     </p>
@@ -410,11 +445,25 @@ export default function AiDoctorPage() {
               )}
               {uploading && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                   上传中…
                 </div>
               )}
             </div>
+            {/* Native gallery button — only visible in Capacitor app */}
+            {isNative() && (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={handleGalleryClick}
+                disabled={uploading}
+              >
+                <Upload className="h-4 w-4 mr-2" aria-hidden="true" />
+                从相册选取
+              </Button>
+            )}
+            {/* Hidden file input — used in browser / PWA */}
             <input
               ref={fileRef}
               type="file"
