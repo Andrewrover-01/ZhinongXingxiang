@@ -1,6 +1,6 @@
-from typing import Annotated
+from typing import Annotated, Optional
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
@@ -9,7 +9,22 @@ from app.core.security import decode_access_token
 from app.models.user import User
 from app.services.user import get_user_by_id
 
-bearer_scheme = HTTPBearer()
+
+class _HTTPBearer401(HTTPBearer):
+    """HTTPBearer that returns 401 (not 403) when credentials are missing."""
+
+    async def __call__(self, request: Request) -> Optional[HTTPAuthorizationCredentials]:
+        try:
+            return await super().__call__(request)
+        except HTTPException:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="未提供认证令牌",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+
+bearer_scheme = _HTTPBearer401()
 
 
 def get_current_user(

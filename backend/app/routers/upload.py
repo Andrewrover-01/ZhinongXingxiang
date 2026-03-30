@@ -1,4 +1,5 @@
 import os
+import re
 import uuid
 from pathlib import Path
 from typing import Annotated
@@ -52,7 +53,17 @@ async def upload_image(
 @router.get("/images/{filename}")
 async def serve_image(filename: str):
     """获取已上传的图片"""
-    file_path = Path(settings.UPLOAD_DIR) / "images" / filename
+    # Only allow safe UUID-based filenames with known image extensions
+    if not re.match(r"^[a-f0-9\-]{36}\.(jpg|jpeg|png|gif|webp)$", filename, re.IGNORECASE):
+        raise HTTPException(status_code=400, detail="无效的文件名")
+
+    upload_base = Path(settings.UPLOAD_DIR).resolve()
+    file_path = (upload_base / "images" / filename).resolve()
+
+    # Guard against path traversal: resolved path must stay inside upload dir
+    if not str(file_path).startswith(str(upload_base)):
+        raise HTTPException(status_code=403, detail="拒绝访问")
+
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="文件不存在")
     return FileResponse(str(file_path))

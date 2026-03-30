@@ -11,9 +11,9 @@ class Settings(BaseSettings):
     # Cache TTL in seconds.  Default: 1 hour (3600 s) for RAG results.
     CACHE_TTL: int = 3600
 
-    SECRET_KEY: str = "dev-secret-key-change-in-production"
+    SECRET_KEY: str = "dev-secret-key-change-in-production"  # Must be overridden via SECRET_KEY env var in production
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080  # 7 days
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60  # 1 hour; use shorter TTL to limit stolen-token exposure
 
     UPLOAD_DIR: str = "./uploads"
     MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024  # 10 MB

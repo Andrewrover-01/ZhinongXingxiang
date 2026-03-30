@@ -113,4 +113,4 @@ def test_farmland_isolation(client: TestClient):
 
 def test_farmland_unauthenticated(client: TestClient):
     resp = client.get("/api/v1/farmlands/")
-    assert resp.status_code == 403
+    assert resp.status_code == 401

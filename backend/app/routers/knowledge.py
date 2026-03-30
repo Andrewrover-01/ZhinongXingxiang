@@ -21,6 +21,7 @@ from app.models.user import User
 from app.rag.vector_store import VectorStore, get_vector_store
 from app.routers.deps import get_current_user
 from app.schemas.knowledge import (
+    KnowledgeCategory,
     KnowledgeCreate,
     KnowledgeListResponse,
     KnowledgeResponse,
@@ -50,25 +51,25 @@ def _vs() -> VectorStore:
 @router.get("/", response_model=KnowledgeListResponse)
 def list_docs(
     db: Annotated[Session, Depends(get_db)],
-    category: Optional[str] = Query(None, description="disease | policy | technique | pest | weather"),
+    category: Optional[KnowledgeCategory] = Query(None, description="disease | policy | technique | pest | weather"),
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
 ):
-    total, items = list_knowledge(db, category=category, skip=skip, limit=limit)
+    total, items = list_knowledge(db, category=category.value if category else None, skip=skip, limit=limit)
     return KnowledgeListResponse(total=total, items=items)
 
 
 @router.get("/search", response_model=List[KnowledgeSearchResult])
 def search_docs(
     q: str = Query(..., min_length=1, description="搜索关键词"),
-    category: Optional[str] = Query(None),
+    category: Optional[KnowledgeCategory] = Query(None),
     n: int = Query(5, ge=1, le=20),
     vs: VectorStore = Depends(_vs),
 ):
     from app.rag.retriever import HybridRetriever
 
     retriever = HybridRetriever(vs, n_semantic=20, n_results=n)
-    where = {"category": category} if category else None
+    where = {"category": category.value} if category else None
     results = retriever.retrieve(q, where=where)
     return [
         KnowledgeSearchResult(
@@ -112,10 +113,12 @@ def update_doc(
     current_user: Annotated[User, Depends(get_current_user)],
     vs: VectorStore = Depends(_vs),
 ):
-    doc = update_knowledge(db, doc_id, data, vs=vs)
+    doc = get_knowledge(db, doc_id)
     if doc is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文档不存在")
-    return doc
+    if doc.upload_by != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权限修改该文档")
+    return update_knowledge(db, doc_id, data, vs=vs)
 
 
 @router.delete("/{doc_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -125,6 +128,9 @@ def delete_doc(
     current_user: Annotated[User, Depends(get_current_user)],
     vs: VectorStore = Depends(_vs),
 ):
-    ok = delete_knowledge(db, doc_id, vs=vs)
-    if not ok:
+    doc = get_knowledge(db, doc_id)
+    if doc is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文档不存在")
+    if doc.upload_by != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权限删除该文档")
+    delete_knowledge(db, doc_id, vs=vs)

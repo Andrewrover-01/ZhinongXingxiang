@@ -45,4 +45,4 @@ def test_upload_unauthenticated(client: TestClient):
         "/api/v1/upload/image",
         files={"file": ("test.jpg", b"\xff\xd8\xff", "image/jpeg")},
     )
-    assert resp.status_code == 403
+    assert resp.status_code == 401

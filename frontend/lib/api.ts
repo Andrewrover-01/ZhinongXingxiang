@@ -200,12 +200,15 @@ export function streamDiagnose(
     body: JSON.stringify(data),
     signal: ctrl.signal,
   });
-  // Return a reader-like wrapper by building a ReadableStream from the fetch
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
         const res = await resp;
-        const reader = res.body!.getReader();
+        if (!res.body) {
+          controller.error(new Error("Empty response body"));
+          return;
+        }
+        const reader = res.body.getReader();
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
@@ -270,7 +273,11 @@ export function streamPolicyChat(
           body: JSON.stringify({ session_id: sessionId, message }),
           signal: ctrl.signal,
         });
-        const reader = res.body!.getReader();
+        if (!res.body) {
+          controller.error(new Error("Empty response body"));
+          return;
+        }
+        const reader = res.body.getReader();
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
