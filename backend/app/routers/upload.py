@@ -15,6 +15,27 @@ router = APIRouter(prefix="/upload", tags=["文件上传"])
 
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 
+# Magic byte signatures for each allowed MIME type.
+# Each entry is a list of (offset, expected_bytes) pairs — ALL must match.
+_MAGIC: dict[str, list[tuple[int, bytes]]] = {
+    "image/jpeg": [(0, b"\xff\xd8\xff")],
+    "image/png":  [(0, b"\x89PNG\r\n\x1a\n")],
+    "image/webp": [(0, b"RIFF"), (8, b"WEBP")],
+    "image/gif":  [(0, b"GIF87a"), (0, b"GIF89a")],  # first matching slice is accepted
+}
+
+
+def _magic_matches(content: bytes, content_type: str) -> bool:
+    """Return True if the file content matches the expected magic bytes for *content_type*."""
+    rules = _MAGIC.get(content_type)
+    if rules is None:
+        return False
+    if content_type == "image/gif":
+        # GIF has two possible signatures; accept either
+        return any(content[off: off + len(sig)] == sig for off, sig in rules)
+    # All (offset, bytes) pairs must match
+    return all(content[off: off + len(sig)] == sig for off, sig in rules)
+
 
 @router.post("/image", status_code=status.HTTP_201_CREATED)
 async def upload_image(
@@ -31,6 +52,13 @@ async def upload_image(
     content = await file.read()
     if len(content) > settings.MAX_UPLOAD_SIZE:
         raise HTTPException(status_code=400, detail="文件大小超过限制（最大 10 MB）")
+
+    # Verify actual file content via magic bytes to prevent Content-Type spoofing
+    if not _magic_matches(content, file.content_type):
+        raise HTTPException(
+            status_code=400,
+            detail="文件内容与声明的格式不符，请上传真实的 JPG/PNG/WebP/GIF 图片",
+        )
 
     upload_dir = Path(settings.UPLOAD_DIR) / "images"
     upload_dir.mkdir(parents=True, exist_ok=True)

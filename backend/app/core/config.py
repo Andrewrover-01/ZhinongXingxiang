@@ -1,5 +1,8 @@
 from typing import Optional
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_WEAK_DEFAULT_SECRET = "dev-secret-key-change-in-production"
 
 
 class Settings(BaseSettings):
@@ -11,7 +14,7 @@ class Settings(BaseSettings):
     # Cache TTL in seconds.  Default: 1 hour (3600 s) for RAG results.
     CACHE_TTL: int = 3600
 
-    SECRET_KEY: str = "dev-secret-key-change-in-production"  # Must be overridden via SECRET_KEY env var in production
+    SECRET_KEY: str = _WEAK_DEFAULT_SECRET  # Must be overridden via SECRET_KEY env var in production
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60  # 1 hour; use shorter TTL to limit stolen-token exposure
 
@@ -25,6 +28,15 @@ class Settings(BaseSettings):
     CHROMA_EMBEDDING_BACKEND: str = "default"  # default | openai | mock
     OPENAI_API_KEY: Optional[str] = None
     QWEN_API_KEY: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _require_strong_secret_key_in_production(self) -> "Settings":
+        if self.APP_ENV == "production" and self.SECRET_KEY == _WEAK_DEFAULT_SECRET:
+            raise ValueError(
+                "SECRET_KEY must be set to a strong random value in production. "
+                "Set the SECRET_KEY environment variable to at least 32 random bytes."
+            )
+        return self
 
 
 settings = Settings()
