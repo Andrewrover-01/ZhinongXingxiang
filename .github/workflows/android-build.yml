@@ -34,7 +34,11 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-          cache: gradle
+          # Note: do NOT set cache: gradle here — the android/ directory does not
+          # exist yet (it is created by "npx cap add android" below), so
+          # setup-java would fail trying to locate gradle-wrapper.properties.
+          # Gradle caching is handled by gradle/actions/setup-gradle after the
+          # Android project is initialised.
 
       # ── Node ──────────────────────────────────────────────────────────────────
       - name: Set up Node 20
@@ -69,6 +73,12 @@ jobs:
           if [ ! -d "android" ]; then
             npx cap add android
           fi
+
+      # ── Enable Gradle caching (must run AFTER android/ exists) ───────────────
+      # gradle/actions/setup-gradle discovers gradle-wrapper.properties inside
+      # the newly created android/ directory and sets up ~/.gradle caching.
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
 
       # ── Sync web assets into Android ─────────────────────────────────────────
       - name: Sync Capacitor
