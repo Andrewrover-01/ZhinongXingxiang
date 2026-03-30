@@ -1,32 +1,16 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from app.core.cache import close_redis
 from app.core.config import settings
 from app.core.database import create_tables
-from app.routers.auth import router as auth_router
-from app.routers.farmland import router as farmland_router
-from app.routers.upload import router as upload_router
-from app.routers.users import router as users_router
-from app.routers.knowledge import router as knowledge_router
-from app.routers.ai_doctor import router as ai_doctor_router
-from app.routers.policy import router as policy_router
-
-
-from contextlib import asynccontextmanager
-from pathlib import Path
-
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-
-from app.core.cache import close_redis
-from app.core.config import settings
-from app.core.database import create_tables
+from app.core.limiter import limiter  # noqa: F401 — re-exported for convenience
 from app.routers.auth import router as auth_router
 from app.routers.farmland import router as farmland_router
 from app.routers.upload import router as upload_router
@@ -67,6 +51,10 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+# ── Rate limiting ─────────────────────────────────────────────────────────────
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
 
 app.add_middleware(
     CORSMiddleware,

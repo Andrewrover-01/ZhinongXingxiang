@@ -12,13 +12,14 @@ import logging
 from datetime import datetime
 from typing import Annotated, List
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sse_starlette.sse import EventSourceResponse
 
 _log = logging.getLogger(__name__)
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.limiter import limiter
 from app.models.recognition import RecognitionRecord
 from app.models.user import User
 from app.rag.chain import RAGChain, get_rag_chain
@@ -36,7 +37,9 @@ router = APIRouter(prefix="/ai-doctor", tags=["AI Doctor"])
     response_model=DiagnoseResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@limiter.limit("20/minute")
 async def diagnose(
+    request: Request,
     req: DiagnoseRequest,
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
@@ -51,7 +54,9 @@ async def diagnose(
 
 
 @router.post("/diagnose/stream")
+@limiter.limit("20/minute")
 async def diagnose_stream(
+    request: Request,
     req: DiagnoseRequest,
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
@@ -61,6 +66,7 @@ async def diagnose_stream(
     Submit an image URL and optional description.
     Returns a Server-Sent Events stream of the diagnosis text.
     A final ``data: [DONE]`` event signals stream completion.
+    A ``data: [ERROR]`` event is emitted if the stream fails mid-way.
     """
 
     async def _event_generator():
@@ -71,11 +77,11 @@ async def diagnose_stream(
                 yield {"data": chunk}
             yield {"data": "[DONE]"}
         except Exception as exc:
-            # Swallow the exception so it does not propagate into
-            # sse_starlette's anyio task-group and become an ExceptionGroup.
-            # asyncio.CancelledError is a BaseException (not Exception) so it
-            # is still re-raised, letting anyio handle normal cancellation.
+            # Signal the client that an error occurred, then swallow the
+            # exception so it does not propagate into sse_starlette's anyio
+            # task group and become an ExceptionGroup.
             _log.warning("SSE diagnose stream error: %s", exc, exc_info=True)
+            yield {"data": "[ERROR]"}
 
     return EventSourceResponse(_event_generator())
 

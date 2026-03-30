@@ -51,6 +51,7 @@ def _vs() -> VectorStore:
 @router.get("/", response_model=KnowledgeListResponse)
 def list_docs(
     db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
     category: Optional[KnowledgeCategory] = Query(None, description="disease | policy | technique | pest | weather"),
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
@@ -61,6 +62,7 @@ def list_docs(
 
 @router.get("/search", response_model=List[KnowledgeSearchResult])
 def search_docs(
+    current_user: Annotated[User, Depends(get_current_user)],
     q: str = Query(..., min_length=1, description="搜索关键词"),
     category: Optional[KnowledgeCategory] = Query(None),
     n: int = Query(5, ge=1, le=20),
@@ -87,7 +89,11 @@ def search_docs(
 
 
 @router.get("/{doc_id}", response_model=KnowledgeResponse)
-def get_doc(doc_id: str, db: Annotated[Session, Depends(get_db)]):
+def get_doc(
+    doc_id: str,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
     doc = get_knowledge(db, doc_id)
     if doc is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文档不存在")

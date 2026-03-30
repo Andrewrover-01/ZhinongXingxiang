@@ -299,8 +299,8 @@ class TestPolicyChatStreamErrorResilience:
     Regression tests for ExceptionGroup: unhandled errors in a TaskGroup.
 
     When the underlying RAG stream raises a RuntimeError (e.g. LLM failure,
-    DB error), the SSE endpoint must return 200 and not let the exception
-    escape into sse_starlette's anyio task group.
+    DB error), the SSE endpoint must return 200 and emit a ``[ERROR]`` event
+    instead of letting the exception escape into sse_starlette's anyio task group.
     """
 
     def test_stream_no_exception_group_on_runtime_error(
@@ -308,7 +308,8 @@ class TestPolicyChatStreamErrorResilience:
     ):
         """
         Simulate a RuntimeError inside run_policy_chat_stream.
-        The endpoint must return 200 and not raise ExceptionGroup.
+        The endpoint must return 200, emit any partial chunks, then emit
+        [ERROR] and not raise ExceptionGroup.
         """
         from unittest.mock import patch
 
@@ -332,4 +333,6 @@ class TestPolicyChatStreamErrorResilience:
         assert resp.status_code == 200
         # The partial chunk before the error should be in the body
         assert "政策" in resp.text
+        # The [ERROR] sentinel must be emitted to the client
+        assert "[ERROR]" in resp.text
 
