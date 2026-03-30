@@ -3,67 +3,417 @@ marp: true
 theme: default
 paginate: true
 style: |
+  /* ═══════════════════════════════════════════════
+     智农兴乡 · 高端农业科技感 MARP 主题
+     色板：深夜绿 #0a1f0a / 科技绿 #00e676 / 金色 #ffd740
+  ═══════════════════════════════════════════════ */
+
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap');
+
+  /* ── 全局基础 ────────────────────────────────── */
   section {
-    font-family: 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif;
-    background-color: #f8fffe;
-    color: #1a2e1a;
+    font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: #0d1f0d;
+    color: #cce8cc;
+    font-size: 18px;
+    line-height: 1.7;
+    padding: 48px 60px;
+    position: relative;
+    overflow: hidden;
   }
-  section.cover {
-    background: linear-gradient(135deg, #1b5e20 0%, #2e7d32 40%, #388e3c 70%, #4caf50 100%);
-    color: #ffffff;
-    text-align: center;
-    justify-content: center;
+
+  /* 全局科技网格背景 */
+  section::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,230,118,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,230,118,0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
   }
-  section.cover h1 {
-    font-size: 2.8em;
+
+  /* 右上角光晕装饰 — 使用 ::before 内的叠加层实现 */
+
+  section > * { position: relative; z-index: 1; }
+
+  /* ── 页码 ─────────────────────────────────── */
+  section::after {
+    content: attr(data-marpit-pagination) ' / ' attr(data-marpit-pagination-total);
+    position: absolute;
+    bottom: 18px;
+    right: 32px;
+    font-size: 0.65em;
+    color: rgba(0,230,118,0.5);
+    z-index: 10;
+    background: none;
+    width: auto;
+    height: auto;
+    top: auto;
+    left: auto;
+    border-radius: 0;
+  }
+
+  /* ── 标题层级 ─────────────────────────────── */
+  h1 {
+    font-size: 1.75em;
     font-weight: 900;
-    letter-spacing: 0.05em;
-    text-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    color: #00e676;
+    letter-spacing: 0.04em;
+    margin-bottom: 0.4em;
+    padding-bottom: 0.25em;
+    border-bottom: 2px solid transparent;
+    border-image: linear-gradient(90deg, #00e676, #ffd740, transparent) 1;
+    text-shadow: 0 0 20px rgba(0,230,118,0.35);
+  }
+
+  h2 {
+    font-size: 1.15em;
+    font-weight: 700;
+    color: #69f0ae;
+    margin-top: 0.8em;
+    margin-bottom: 0.3em;
+    letter-spacing: 0.02em;
+  }
+
+  h3 {
+    font-size: 1.0em;
+    font-weight: 500;
+    color: #a5d6a7;
+    margin-top: 0.6em;
     margin-bottom: 0.2em;
   }
+
+  /* ── 表格 ────────────────────────────────── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82em;
+    margin: 0.6em 0;
+    border: 1px solid rgba(0,230,118,0.2);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  thead tr {
+    background: linear-gradient(90deg, #003320, #005c2e);
+  }
+
+  th {
+    color: #00e676;
+    padding: 9px 14px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    font-size: 0.85em;
+    border-bottom: 1px solid rgba(0,230,118,0.3);
+  }
+
+  td {
+    padding: 7px 14px;
+    border-bottom: 1px solid rgba(0,230,118,0.1);
+    color: #b2dfb2;
+  }
+
+  tr:nth-child(even) td {
+    background: rgba(0,230,118,0.04);
+  }
+
+  tr:hover td {
+    background: rgba(0,230,118,0.09);
+    color: #e8f5e9;
+  }
+
+  /* ── 代码 ────────────────────────────────── */
+  code {
+    background: rgba(0,230,118,0.1);
+    color: #00e676;
+    border-radius: 4px;
+    padding: 1px 7px;
+    font-size: 0.88em;
+    border: 1px solid rgba(0,230,118,0.25);
+    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  }
+
+  pre {
+    background: #050f05;
+    border: 1px solid rgba(0,230,118,0.2);
+    border-left: 3px solid #00e676;
+    border-radius: 8px;
+    padding: 14px 18px;
+    font-size: 0.72em;
+    color: #80cbc4;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    line-height: 1.6;
+    overflow: hidden;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.5), inset 0 0 40px rgba(0,230,118,0.02);
+  }
+
+  pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    color: inherit;
+    font-size: 1em;
+  }
+
+  /* ── 引用块 ──────────────────────────────── */
+  blockquote {
+    border-left: 3px solid #ffd740;
+    background: rgba(255,215,64,0.06);
+    padding: 10px 16px;
+    margin: 0.8em 0;
+    border-radius: 0 6px 6px 0;
+    color: #fff9e6;
+    font-size: 0.9em;
+  }
+
+  blockquote p { margin: 0; }
+
+  /* ── 列表 ────────────────────────────────── */
+  ul, ol {
+    padding-left: 1.4em;
+    margin: 0.4em 0;
+  }
+
+  li {
+    margin: 0.25em 0;
+    color: #b2dfb2;
+  }
+
+  li strong { color: #e8f5e9; }
+
+  /* ── 强调 ────────────────────────────────── */
+  strong { color: #00e676; font-weight: 700; }
+  em { color: #ffd740; font-style: normal; font-weight: 500; }
+
+  /* ── 水平分割线 ──────────────────────────── */
+  hr {
+    border: none;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, #00e676, #ffd740, transparent);
+    margin: 1em 0;
+  }
+
+  /* ── 页脚 ────────────────────────────────── */
+  footer {
+    font-size: 0.62em;
+    color: rgba(0,230,118,0.4);
+    letter-spacing: 0.05em;
+  }
+
+  /* ════════════════════════════════════════════
+     封面页  _class: cover
+  ════════════════════════════════════════════ */
+  section.cover {
+    background:
+      radial-gradient(ellipse 80% 60% at 50% 30%, rgba(0,100,50,0.55) 0%, transparent 70%),
+      radial-gradient(ellipse 50% 40% at 80% 80%, rgba(255,215,64,0.08) 0%, transparent 60%),
+      linear-gradient(160deg, #020c02 0%, #071407 40%, #0a1f0a 100%);
+    color: #e8f5e9;
+    text-align: center;
+    justify-content: center;
+    align-items: center;
+  }
+
+  /* 封面科技圆环装饰 */
+  section.cover::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 520px;
+    height: 520px;
+    border-radius: 50%;
+    border: 1px solid rgba(0,230,118,0.08);
+    box-shadow:
+      0 0 0 40px rgba(0,230,118,0.03),
+      0 0 0 80px rgba(0,230,118,0.02),
+      0 0 0 120px rgba(0,230,118,0.01);
+    pointer-events: none;
+  }
+
+  section.cover::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,230,118,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,230,118,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+    border-radius: 0;
+    background-color: transparent;
+  }
+
+  section.cover > * { position: relative; z-index: 2; }
+
+  section.cover h1 {
+    font-size: 3.4em;
+    font-weight: 900;
+    letter-spacing: 0.12em;
+    color: #ffffff;
+    text-shadow:
+      0 0 40px rgba(0,230,118,0.7),
+      0 0 80px rgba(0,230,118,0.3),
+      0 2px 4px rgba(0,0,0,0.8);
+    margin-bottom: 0.1em;
+    border: none;
+    background: none;
+    padding: 0;
+  }
+
   section.cover h2 {
-    font-size: 1.2em;
+    font-size: 1.05em;
     font-weight: 400;
-    opacity: 0.9;
-    margin-top: 0;
+    color: rgba(200,240,200,0.85);
+    letter-spacing: 0.08em;
+    margin: 0.3em 0 0 0;
+    text-shadow: 0 1px 8px rgba(0,0,0,0.6);
   }
+
   section.cover p {
-    font-size: 0.95em;
-    opacity: 0.8;
-    margin-top: 2em;
+    font-size: 0.85em;
+    color: rgba(160,220,160,0.7);
+    margin-top: 2.2em;
+    letter-spacing: 0.03em;
   }
+
+  section.cover blockquote {
+    display: inline-block;
+    background: rgba(0,230,118,0.08);
+    border-left: 3px solid #00e676;
+    border-radius: 4px;
+    padding: 8px 22px;
+    margin: 1.6em auto 0;
+    font-size: 1em;
+    color: #b9f6ca;
+    letter-spacing: 0.12em;
+    font-weight: 500;
+    box-shadow: 0 0 20px rgba(0,230,118,0.15);
+  }
+
+  /* 封面标签栏 */
+  .cover-tags {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 1.8em;
+    flex-wrap: wrap;
+  }
+
+  /* ════════════════════════════════════════════
+     章节标题页  _class: section-header
+  ════════════════════════════════════════════ */
   section.section-header {
-    background: linear-gradient(135deg, #2e7d32, #4caf50);
+    background:
+      radial-gradient(ellipse 70% 50% at 30% 50%, rgba(0,100,50,0.4) 0%, transparent 65%),
+      linear-gradient(135deg, #030f03 0%, #071407 50%, #0a1f0a 100%);
     color: #fff;
     justify-content: center;
     text-align: center;
+    align-items: center;
   }
+
+  section.section-header::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: linear-gradient(180deg, transparent, #00e676 30%, #ffd740 70%, transparent);
+  }
+
   section.section-header h1 {
-    font-size: 2.2em;
-    text-shadow: 0 1px 4px rgba(0,0,0,0.3);
+    font-size: 2.6em;
+    font-weight: 900;
+    letter-spacing: 0.1em;
+    color: #ffffff;
+    text-shadow:
+      0 0 30px rgba(0,230,118,0.6),
+      0 0 60px rgba(0,230,118,0.2),
+      0 2px 6px rgba(0,0,0,0.7);
+    border: none;
+    background: none;
+    padding: 0;
+    margin: 0;
   }
-  h1 { color: #1b5e20; border-bottom: 3px solid #4caf50; padding-bottom: 0.2em; }
-  h2 { color: #2e7d32; }
-  h3 { color: #388e3c; }
-  table { width: 100%; border-collapse: collapse; font-size: 0.85em; }
-  th { background: #2e7d32; color: #fff; padding: 8px 12px; }
-  td { padding: 7px 12px; border-bottom: 1px solid #c8e6c9; }
-  tr:nth-child(even) td { background: #e8f5e9; }
-  code { background: #e8f5e9; color: #1b5e20; border-radius: 4px; padding: 2px 6px; }
-  pre { background: #1b2e1b; color: #a5d6a7; border-radius: 8px; padding: 16px; font-size: 0.75em; }
-  .highlight { color: #4caf50; font-weight: bold; }
-  .badge {
+
+  section.section-header h2 {
+    font-size: 0.9em;
+    font-weight: 300;
+    color: rgba(0,230,118,0.7);
+    letter-spacing: 0.2em;
+    margin-top: 0.5em;
+    text-transform: uppercase;
+  }
+
+  /* ════════════════════════════════════════════
+     数据高亮卡片  _class: data-card
+  ════════════════════════════════════════════ */
+  section.data-card {
+    background: linear-gradient(135deg, #061206 0%, #0a1f0a 100%);
+  }
+
+  /* ── 通用工具类 ──────────────────────────── */
+  .tag {
     display: inline-block;
-    background: #4caf50;
-    color: #fff;
-    border-radius: 12px;
-    padding: 2px 10px;
-    font-size: 0.8em;
-    margin: 2px;
+    background: rgba(0,230,118,0.12);
+    color: #00e676;
+    border: 1px solid rgba(0,230,118,0.3);
+    border-radius: 20px;
+    padding: 2px 12px;
+    font-size: 0.75em;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    margin: 2px 3px;
   }
-  footer {
-    font-size: 0.7em;
-    color: #81c784;
+
+  .tag-gold {
+    background: rgba(255,215,64,0.1);
+    color: #ffd740;
+    border-color: rgba(255,215,64,0.3);
+  }
+
+  .badge-success {
+    background: rgba(0,230,118,0.15);
+    color: #69f0ae;
+    border: 1px solid rgba(0,230,118,0.3);
+    border-radius: 4px;
+    padding: 1px 8px;
+    font-size: 0.8em;
+    font-weight: 700;
+  }
+
+  .number-highlight {
+    font-size: 1.5em;
+    font-weight: 900;
+    color: #00e676;
+    text-shadow: 0 0 12px rgba(0,230,118,0.5);
+  }
+
+  /* ── 目录表格特化 ──────────────────────────── */
+  .toc-table th {
+    font-size: 0.8em;
+    color: rgba(0,230,118,0.6);
+  }
+
+  .toc-table td:first-child {
+    color: #ffd740;
+    font-weight: 700;
+    font-size: 0.9em;
+    width: 12%;
+    text-align: center;
+  }
+
+  .toc-table td:last-child {
+    color: #cce8cc;
+    font-weight: 500;
   }
 ---
 
@@ -73,14 +423,9 @@ style: |
 
 ## 基于 RAG 的智慧农业 AI 全栈平台
 
-<br>
-
 > 会看病 · 懂政策 · 知农情 · 能决策
 
-<br>
-
-大学生创新创业训练计划（大创）参赛项目  
-2024 年度展示版本
+大学生创新创业训练计划（大创）参赛项目 · 2025 年度展示版本
 
 ---
 
@@ -90,24 +435,26 @@ style: |
 
 <br>
 
-| # | 章节 |
-|---|------|
-| 01 | 项目背景与痛点 |
-| 02 | 解决方案与核心价值 |
-| 03 | 四大核心功能模块 |
-| 04 | 技术架构全景 |
-| 05 | AI 能力深度解析 |
-| 06 | 产品界面展示 |
-| 07 | 性能与压测数据 |
-| 08 | 商业价值与社会意义 |
-| 09 | 团队介绍 |
-| 10 | 未来规划与路线图 |
+| № | 章节 |
+|:-:|------|
+| **01** | 项目背景与痛点 |
+| **02** | 解决方案与核心价值 |
+| **03** | 四大核心功能模块 |
+| **04** | 技术架构全景 |
+| **05** | AI 能力深度解析 |
+| **06** | 产品界面展示 |
+| **07** | 性能与压测数据 |
+| **08** | 商业价值与社会意义 |
+| **09** | 团队介绍 |
+| **10** | 未来规划与路线图 |
 
 ---
 
 <!-- _class: section-header -->
 
 # 01 · 项目背景与痛点
+
+## BACKGROUND & PAIN POINTS
 
 ---
 
@@ -133,6 +480,8 @@ style: |
 <!-- _class: section-header -->
 
 # 02 · 解决方案与核心价值
+
+## SOLUTION & CORE VALUE
 
 ---
 
@@ -189,6 +538,8 @@ Next.js 网页端 + Capacitor 封装 Android APK，代码复用率 ≥ 90%，
 <!-- _class: section-header -->
 
 # 03 · 四大核心功能模块
+
+## CORE FEATURE MODULES
 
 ---
 
@@ -293,6 +644,8 @@ LLM 综合推理（病害 + 严重程度 + 治疗方案 + 用药建议）
 
 # 04 · 技术架构全景
 
+## TECHNOLOGY ARCHITECTURE
+
 ---
 
 # 技术栈全景
@@ -342,6 +695,8 @@ Internet
 <!-- _class: section-header -->
 
 # 05 · AI 能力深度解析
+
+## AI CAPABILITY DEEP DIVE
 
 ---
 
@@ -410,6 +765,8 @@ await cache_set(cache_key, result, ttl=3600)  # TTL = 1 小时
 
 # 06 · 产品界面展示
 
+## PRODUCT SHOWCASE
+
 ---
 
 # 产品功能界面
@@ -439,24 +796,24 @@ await cache_set(cache_key, result, ttl=3600)  # TTL = 1 小时
 
 # 07 · 性能与压测数据
 
+## PERFORMANCE & LOAD TEST
+
 ---
 
 # Locust 压测结果
 
-## 测试配置
+### 测试配置
 
-- **工具**：Locust 2.32.3  
-- **并发用户数**：100  
-- **爬升速率**：10 用户/秒  
-- **持续时间**：120 秒  
+- **工具**：Locust 2.32.3 · **并发用户数**：100 · **爬升速率**：10 用户/秒
+- **持续时间**：120 秒
 - **场景覆盖**：健康检查 / 知识检索 / 农田 CRUD / AI 诊断 / 政策问答
 
 <br>
 
-## 压测结果
+### 压测结果
 
 | 指标 | 目标 | 实测 | 结论 |
-|------|------|------|------|
+|------|------|------|:----:|
 | P95 响应时间 | ≤ 5,000 ms | **4,230 ms** | ✅ 达标 |
 | 错误率 | ≤ 1% | **0.3%** | ✅ 达标 |
 | 平均吞吐量 | — | **~380 RPS** | ✅ 良好 |
@@ -494,6 +851,8 @@ await cache_set(cache_key, result, ttl=3600)  # TTL = 1 小时
 
 # 08 · 商业价值与社会意义
 
+## BUSINESS VALUE & SOCIAL IMPACT
+
 ---
 
 # 多维价值分析
@@ -526,6 +885,8 @@ await cache_set(cache_key, result, ttl=3600)  # TTL = 1 小时
 
 # 09 · 团队介绍
 
+## TEAM INTRODUCTION
+
 ---
 
 # 团队构成
@@ -552,6 +913,8 @@ await cache_set(cache_key, result, ttl=3600)  # TTL = 1 小时
 <!-- _class: section-header -->
 
 # 10 · 未来规划与路线图
+
+## ROADMAP & FUTURE VISION
 
 ---
 
@@ -611,16 +974,6 @@ await cache_set(cache_key, result, ttl=3600)  # TTL = 1 小时
 
 ## 《智农兴乡》—— 让 AI 技术扎根田间地头
 
-<br>
-
 > 会看病 · 懂政策 · 知农情 · 能决策
 
-<br>
-
-📂 **项目仓库**：`github.com/Andrewrover-01/ZhinongXingxiang`  
-📖 **API 文档**：`/docs`（FastAPI Swagger UI 自动生成）  
-🐳 **一键部署**：`docker compose up -d`
-
-<br>
-
-*欢迎提问与交流！*
+📂 **项目仓库**：`github.com/Andrewrover-01/ZhinongXingxiang`  ·  🐳 `docker compose up -d`
