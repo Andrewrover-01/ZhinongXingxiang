@@ -1,0 +1,54 @@
+{
+  "name": "智农兴乡",
+  "short_name": "智农兴乡",
+  "description": "基于 RAG 的智慧农业全栈平台",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#16a34a",
+  "orientation": "portrait-primary",
+  "lang": "zh-CN",
+  "categories": ["agriculture", "productivity"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "AI 医生",
+      "short_name": "诊断",
+      "url": "/ai-doctor",
+      "description": "病虫害智能诊断"
+    },
+    {
+      "name": "农策助手",
+      "short_name": "政策",
+      "url": "/policy",
+      "description": "政策问答咨询"
+    }
+  ],
+  "screenshots": [],
+  "prefer_related_applications": false
+}

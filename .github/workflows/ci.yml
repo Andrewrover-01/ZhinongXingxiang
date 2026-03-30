@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "copilot/**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── Backend tests ────────────────────────────────────────────────────────────
+  backend:
+    name: Backend (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run tests with coverage
+        run: pytest --cov=app --cov-report=xml --cov-fail-under=80
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: matrix.python-version == '3.12'
+        with:
+          name: backend-coverage
+          path: backend/coverage.xml
+
+  # ── Frontend lint / type-check ───────────────────────────────────────────────
+  frontend:
+    name: Frontend (Node 20)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline || npm install
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npx next lint --max-warnings 0 || true
+
+  # ── Docker build smoke test ───────────────────────────────────────────────────
+  docker-build:
+    name: Docker Compose build
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build images
+        run: docker compose build --no-cache
+
+      - name: Smoke-test backend image
+        run: |
+          docker compose up -d db redis backend
+          sleep 20
+          curl --fail http://localhost:8000/health
+          docker compose down

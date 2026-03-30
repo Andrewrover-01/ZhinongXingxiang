@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>智农兴乡 — 离线</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB",
+                   "Microsoft YaHei", sans-serif;
+      background: #f0fdf4;
+      color: #166534;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1.5rem;
+      padding: 2rem;
+      text-align: center;
+    }
+    .icon { font-size: 4rem; line-height: 1; }
+    h1 { font-size: 1.5rem; font-weight: 700; }
+    p  { font-size: 0.95rem; color: #4b7c5f; max-width: 320px; line-height: 1.6; }
+    button {
+      margin-top: 0.5rem;
+      padding: 0.6rem 1.5rem;
+      border-radius: 0.5rem;
+      background: #16a34a;
+      color: #fff;
+      font-size: 0.95rem;
+      border: none;
+      cursor: pointer;
+    }
+    button:active { opacity: 0.85; }
+  </style>
+</head>
+<body>
+  <div class="icon">🌾</div>
+  <h1>智农兴乡</h1>
+  <p>当前处于离线状态。<br />请检查网络连接后重试。<br />历史诊断记录仍可在 AI 医生页面离线查看。</p>
+  <button onclick="location.reload()">重新连接</button>
+</body>
+</html>
