@@ -8,11 +8,14 @@ GET  /ai-doctor/records             list current user's diagnosis history
 GET  /ai-doctor/records/{id}        get single diagnosis record
 """
 
+import logging
 from datetime import datetime
 from typing import Annotated, List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sse_starlette.sse import EventSourceResponse
+
+_log = logging.getLogger(__name__)
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -61,11 +64,18 @@ async def diagnose_stream(
     """
 
     async def _event_generator():
-        async for chunk in run_diagnosis_stream(
-            db, req, user_id=current_user.id, chain=chain
-        ):
-            yield {"data": chunk}
-        yield {"data": "[DONE]"}
+        try:
+            async for chunk in run_diagnosis_stream(
+                db, req, user_id=current_user.id, chain=chain
+            ):
+                yield {"data": chunk}
+            yield {"data": "[DONE]"}
+        except Exception as exc:
+            # Swallow the exception so it does not propagate into
+            # sse_starlette's anyio task-group and become an ExceptionGroup.
+            # asyncio.CancelledError is a BaseException (not Exception) so it
+            # is still re-raised, letting anyio handle normal cancellation.
+            _log.warning("SSE diagnose stream error: %s", exc, exc_info=True)
 
     return EventSourceResponse(_event_generator())
 

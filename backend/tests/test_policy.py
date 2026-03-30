@@ -287,3 +287,49 @@ class TestDeleteSession:
     def test_delete_requires_auth(self, client: TestClient):
         resp = client.delete(f"/api/v1/policy/sessions/{_new_session_id()}")
         assert resp.status_code == 401
+
+
+# ── SSE error-resilience tests ───────────────────────────────────────────────
+# Verify that an exception raised inside the stream generator is swallowed
+# by the try/except in _event_generator() and does NOT propagate as an
+# ExceptionGroup out of sse_starlette's anyio task group.
+
+class TestPolicyChatStreamErrorResilience:
+    """
+    Regression tests for ExceptionGroup: unhandled errors in a TaskGroup.
+
+    When the underlying RAG stream raises a RuntimeError (e.g. LLM failure,
+    DB error), the SSE endpoint must return 200 and not let the exception
+    escape into sse_starlette's anyio task group.
+    """
+
+    def test_stream_no_exception_group_on_runtime_error(
+        self, client: TestClient
+    ):
+        """
+        Simulate a RuntimeError inside run_policy_chat_stream.
+        The endpoint must return 200 and not raise ExceptionGroup.
+        """
+        from unittest.mock import patch
+
+        async def _failing_stream(*args, **kwargs):
+            yield "政策"
+            raise RuntimeError("simulated LLM failure")
+
+        token = _register_and_login(client, "sse_err_policy1", "15800000001")
+
+        with patch(
+            "app.routers.policy.run_policy_chat_stream",
+            side_effect=_failing_stream,
+        ):
+            resp = client.post(
+                "/api/v1/policy/chat",
+                json={"session_id": _new_session_id(), "message": "补贴政策"},
+                headers=_auth(token),
+            )
+
+        # The server must not crash; 200 is the expected SSE start code
+        assert resp.status_code == 200
+        # The partial chunk before the error should be in the body
+        assert "政策" in resp.text
+

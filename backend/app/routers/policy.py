@@ -12,12 +12,15 @@ DELETE /policy/sessions/{session_id} delete a session
 from __future__ import annotations
 
 import json
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sse_starlette.sse import EventSourceResponse  # type: ignore
+
+_log = logging.getLogger(__name__)
 
 from app.core.database import get_db
 from app.models.user import User
@@ -51,15 +54,22 @@ async def policy_chat(
     """
 
     async def _event_generator():
-        async for chunk in run_policy_chat_stream(
-            db,
-            session_id=req.session_id,
-            user_id=current_user.id,
-            message=req.message,
-            chain=chain,
-        ):
-            yield {"data": chunk}
-        yield {"data": "[DONE]"}
+        try:
+            async for chunk in run_policy_chat_stream(
+                db,
+                session_id=req.session_id,
+                user_id=current_user.id,
+                message=req.message,
+                chain=chain,
+            ):
+                yield {"data": chunk}
+            yield {"data": "[DONE]"}
+        except Exception as exc:
+            # Swallow the exception so it does not propagate into
+            # sse_starlette's anyio task-group and become an ExceptionGroup.
+            # asyncio.CancelledError is a BaseException (not Exception) so it
+            # is still re-raised, letting anyio handle normal cancellation.
+            _log.warning("SSE policy chat stream error: %s", exc, exc_info=True)
 
     return EventSourceResponse(_event_generator())
 

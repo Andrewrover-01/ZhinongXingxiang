@@ -17,12 +17,45 @@ from app.routers.ai_doctor import router as ai_doctor_router
 from app.routers.policy import router as policy_router
 
 
+from contextlib import asynccontextmanager
+from pathlib import Path
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+
+from app.core.cache import close_redis
+from app.core.config import settings
+from app.core.database import create_tables
+from app.routers.auth import router as auth_router
+from app.routers.farmland import router as farmland_router
+from app.routers.upload import router as upload_router
+from app.routers.users import router as users_router
+from app.routers.knowledge import router as knowledge_router
+from app.routers.ai_doctor import router as ai_doctor_router
+from app.routers.policy import router as policy_router
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Ensure upload directory exists
     Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
     # Auto-create tables for SQLite / development
     create_tables()
+
+    # Reset sse_starlette's AppStatus.should_exit_event so it is always
+    # created inside the current event loop.  Without this, the module-level
+    # anyio.Event singleton can be bound to a *stale* event loop (e.g. after a
+    # hot-reload or in test environments where each TestClient spawns its own
+    # loop), causing sse_starlette's listen_for_exit_signal task to raise
+    # "RuntimeError: ... is bound to a different event loop" which then
+    # propagates as an ExceptionGroup out of the anyio task group.
+    try:
+        from sse_starlette.sse import AppStatus  # type: ignore
+        AppStatus.should_exit_event = None
+    except ImportError:  # pragma: no cover
+        pass
+
     yield
     # Gracefully close the Redis connection pool on shutdown
     await close_redis()
