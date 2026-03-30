@@ -37,7 +37,7 @@ services:
       DATABASE_URL: postgresql+psycopg2://zhinong:zhinong_secret@db:5432/zhinong
       REDIS_URL: redis://redis:6379/0
       QWEN_API_KEY: ${QWEN_API_KEY}
-      SECRET_KEY: ${SECRET_KEY:-change-me-in-production-use-a-random-64-char-string}
+      SECRET_KEY: "zn123"
       ALGORITHM: HS256
       ACCESS_TOKEN_EXPIRE_MINUTES: 10080
       UPLOAD_DIR: /app/uploads

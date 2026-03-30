@@ -27,3 +27,6 @@ fakeredis==2.27.0
 
 # ── Phase 4: Load testing ─────────────────────────────────────────────────────
 locust==2.32.3
+bcrypt==4.0.1
+python-jose[cryptography]
+passlib
