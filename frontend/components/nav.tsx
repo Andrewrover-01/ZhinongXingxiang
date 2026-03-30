@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { Sprout, LogOut, Home, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { authApi } from "@/lib/api";
 
 const NAV_ITEMS = [
   { href: "/ai-doctor", label: "🩺 AI 医生" },
@@ -21,9 +22,11 @@ export function Nav() {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  function handleLogout() {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("access_token");
+  async function handleLogout() {
+    try {
+      await authApi.logout(); // clears the httpOnly cookie server-side
+    } catch {
+      // ignore errors — redirect regardless
     }
     router.push("/login");
     setMenuOpen(false);

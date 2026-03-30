@@ -184,8 +184,7 @@ export const aiDoctorApi = {
 
 /** Open an SSE stream for AI Doctor streaming diagnosis. Returns a Reader. */
 export function streamDiagnose(
-  data: DiagnoseRequest,
-  token: string
+  data: DiagnoseRequest
 ): ReadableStreamDefaultReader<Uint8Array> {
   const ctrl = new AbortController();
   const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -193,8 +192,8 @@ export function streamDiagnose(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
     },
+    credentials: "include", // send httpOnly auth cookie
     body: JSON.stringify(data),
     signal: ctrl.signal,
   });
@@ -254,8 +253,7 @@ export const policyApi = {
 /** Open an SSE stream for Policy chat. Returns a ReadableStreamDefaultReader. */
 export function streamPolicyChat(
   sessionId: string,
-  message: string,
-  token: string
+  message: string
 ): ReadableStreamDefaultReader<Uint8Array> {
   const ctrl = new AbortController();
   const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -266,8 +264,8 @@ export function streamPolicyChat(
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
           },
+          credentials: "include", // send httpOnly auth cookie
           body: JSON.stringify({ session_id: sessionId, message }),
           signal: ctrl.signal,
         });
