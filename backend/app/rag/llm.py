@@ -1,21 +1,27 @@
 """
 Thin LLM wrapper.
 
-When ``OPENAI_API_KEY`` is set the wrapper calls the OpenAI Chat API.
-Otherwise it falls back to a *no-key* response that formats the retrieved
-knowledge documents into a readable answer, making the system fully usable
-even without an API key.
+Priority order for LLM backend selection:
+1. ``QWEN_API_KEY`` — calls Alibaba Cloud DashScope (通义千问) via its
+   OpenAI-compatible endpoint.  Recommended for mainland-China deployments.
+2. ``OPENAI_API_KEY`` — calls the OpenAI Chat API directly.
+3. Fallback — formats the retrieved knowledge documents into a readable answer;
+   fully usable even without any API key.
 """
 
 from __future__ import annotations
 
-import textwrap
-from typing import Any, AsyncGenerator, Dict, List
+from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from app.core.config import settings
 
 # Maximum context window we send to the LLM
 _MAX_CONTEXT_CHARS = 4000
+
+# DashScope (Qwen) OpenAI-compatible endpoint
+_DASHSCOPE_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+_QWEN_MODEL = "qwen-plus"
+_OPENAI_MODEL = "gpt-4o-mini"
 
 
 def _format_sources(sources: List[Dict[str, Any]]) -> str:
@@ -56,10 +62,41 @@ async def _fallback_stream(
 class LLMClient:
     """
     Async LLM client that supports both streaming and non-streaming calls.
+
+    Backend selection (in priority order):
+    1. QWEN_API_KEY → Alibaba Cloud DashScope / 通义千问 (qwen-plus)
+    2. OPENAI_API_KEY → OpenAI (gpt-4o-mini)
+    3. Fallback → format retrieved documents without an LLM call
     """
 
     def __init__(self) -> None:
-        self._has_key = bool(settings.OPENAI_API_KEY)
+        # Determine which backend to use
+        qwen_key = settings.QWEN_API_KEY
+        openai_key = settings.OPENAI_API_KEY
+
+        if qwen_key:
+            self._api_key = qwen_key
+            self._base_url: Optional[str] = _DASHSCOPE_BASE_URL
+            self._model = _QWEN_MODEL
+        elif openai_key:
+            self._api_key = openai_key
+            self._base_url = None  # use the default OpenAI base URL
+            self._model = _OPENAI_MODEL
+        else:
+            self._api_key = None
+            self._base_url = None
+            self._model = "fallback"
+
+        self._has_key = bool(self._api_key)
+
+    def _make_client(self):
+        """Return a lazily-created AsyncOpenAI client."""
+        from openai import AsyncOpenAI  # lazy import
+
+        kwargs: Dict[str, Any] = {"api_key": self._api_key}
+        if self._base_url:
+            kwargs["base_url"] = self._base_url
+        return AsyncOpenAI(**kwargs)
 
     # ── Non-streaming ──────────────────────────────────────────────────────────
 
@@ -72,9 +109,7 @@ class LLMClient:
         if not self._has_key:
             return _fallback_answer(query, sources)
 
-        from openai import AsyncOpenAI  # lazy import
-
-        client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+        client = self._make_client()
         context = _format_sources(sources)[:_MAX_CONTEXT_CHARS]
         messages = [
             {
@@ -92,7 +127,7 @@ class LLMClient:
             },
         ]
         resp = await client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=self._model,
             messages=messages,  # type: ignore[arg-type]
             temperature=0.3,
             max_tokens=1024,
@@ -112,9 +147,7 @@ class LLMClient:
                 yield chunk
             return
 
-        from openai import AsyncOpenAI  # lazy import
-
-        client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+        client = self._make_client()
         context = _format_sources(sources)[:_MAX_CONTEXT_CHARS]
         messages = [
             {
@@ -131,7 +164,7 @@ class LLMClient:
             },
         ]
         async with await client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=self._model,
             messages=messages,  # type: ignore[arg-type]
             temperature=0.3,
             max_tokens=1024,

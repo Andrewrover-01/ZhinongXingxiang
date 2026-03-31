@@ -30,7 +30,14 @@ class Settings(BaseSettings):
     QWEN_API_KEY: Optional[str] = None
 
     @model_validator(mode="after")
-    def _require_strong_secret_key_in_production(self) -> "Settings":
+    def _validate_settings(self) -> "Settings":
+        # Treat blank strings (e.g. unset docker-compose variables) as None
+        if not self.OPENAI_API_KEY:
+            self.OPENAI_API_KEY = None
+        if not self.QWEN_API_KEY:
+            self.QWEN_API_KEY = None
+
+        # Enforce strong configuration in production
         if self.APP_ENV == "production" and self.SECRET_KEY == _WEAK_DEFAULT_SECRET:
             raise ValueError(
                 "SECRET_KEY must be set to a strong random value in production. "
