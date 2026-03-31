@@ -88,7 +88,8 @@ _SAMPLE_DOC = {
 
 class TestListKnowledge:
     def test_list_empty(self, client: TestClient):
-        resp = client.get("/api/v1/knowledge/")
+        token = _register_and_login(client, "list_anon_user", "13000000099")
+        resp = client.get("/api/v1/knowledge/", headers=_auth(token))
         assert resp.status_code == 200
         data = resp.json()
         assert data["total"] == 0
@@ -97,7 +98,7 @@ class TestListKnowledge:
     def test_list_after_create(self, client: TestClient):
         token = _register_and_login(client, "list_user1", "13000000001")
         client.post("/api/v1/knowledge/", json=_SAMPLE_DOC, headers=_auth(token))
-        resp = client.get("/api/v1/knowledge/")
+        resp = client.get("/api/v1/knowledge/", headers=_auth(token))
         assert resp.status_code == 200
         assert resp.json()["total"] == 1
 
@@ -106,7 +107,7 @@ class TestListKnowledge:
         for i in range(5):
             doc = {**_SAMPLE_DOC, "title": f"文档{i}"}
             client.post("/api/v1/knowledge/", json=doc, headers=_auth(token))
-        resp = client.get("/api/v1/knowledge/?limit=2")
+        resp = client.get("/api/v1/knowledge/?limit=2", headers=_auth(token))
         assert resp.status_code == 200
         assert len(resp.json()["items"]) == 2
 
@@ -118,7 +119,7 @@ class TestListKnowledge:
                 json={**_SAMPLE_DOC, "title": f"分页文档{i}"},
                 headers=_auth(token),
             )
-        resp = client.get("/api/v1/knowledge/?skip=2&limit=10")
+        resp = client.get("/api/v1/knowledge/?skip=2&limit=10", headers=_auth(token))
         assert resp.status_code == 200
         assert resp.json()["total"] == 3
         assert len(resp.json()["items"]) == 1
@@ -127,15 +128,15 @@ class TestListKnowledge:
         token = _register_and_login(client, "list_user4", "13000000004")
         client.post("/api/v1/knowledge/", json={**_SAMPLE_DOC, "category": "disease"}, headers=_auth(token))
         client.post("/api/v1/knowledge/", json={**_SAMPLE_DOC, "title": "政策文档", "category": "policy"}, headers=_auth(token))
-        resp = client.get("/api/v1/knowledge/?category=disease")
+        resp = client.get("/api/v1/knowledge/?category=disease", headers=_auth(token))
         assert resp.status_code == 200
         for item in resp.json()["items"]:
             assert item["category"] == "disease"
 
-    def test_list_no_auth_required(self, client: TestClient):
-        """GET /knowledge/ is public — no token needed."""
+    def test_list_requires_auth(self, client: TestClient):
+        """GET /knowledge/ now requires authentication."""
         resp = client.get("/api/v1/knowledge/")
-        assert resp.status_code == 200
+        assert resp.status_code == 401
 
 
 # ── Create tests ──────────────────────────────────────────────────────────────
@@ -196,22 +197,25 @@ class TestGetKnowledge:
         create_resp = client.post("/api/v1/knowledge/", json=_SAMPLE_DOC, headers=_auth(token))
         doc_id = create_resp.json()["id"]
 
-        resp = client.get(f"/api/v1/knowledge/{doc_id}")
+        resp = client.get(f"/api/v1/knowledge/{doc_id}", headers=_auth(token))
         assert resp.status_code == 200
         assert resp.json()["id"] == doc_id
         assert resp.json()["title"] == _SAMPLE_DOC["title"]
 
     def test_get_nonexistent_returns_404(self, client: TestClient):
-        resp = client.get("/api/v1/knowledge/nonexistent-uuid-1234")
+        token = _register_and_login(client, "get_user_404", "13200000099")
+        resp = client.get("/api/v1/knowledge/nonexistent-uuid-1234", headers=_auth(token))
         assert resp.status_code == 404
 
-    def test_get_no_auth_required(self, client: TestClient):
-        """GET by ID is public."""
+    def test_get_requires_auth(self, client: TestClient):
+        """GET by ID now requires authentication."""
         token = _register_and_login(client, "get_user2", "13200000002")
         create_resp = client.post("/api/v1/knowledge/", json=_SAMPLE_DOC, headers=_auth(token))
         doc_id = create_resp.json()["id"]
+        # Clear the login cookie so the next request is truly unauthenticated
+        client.cookies.clear()
         resp = client.get(f"/api/v1/knowledge/{doc_id}")
-        assert resp.status_code == 200
+        assert resp.status_code == 401
 
 
 # ── Update tests ──────────────────────────────────────────────────────────────
@@ -248,7 +252,8 @@ class TestUpdateKnowledge:
         token = _register_and_login(client, "update_user3", "13300000003")
         create_resp = client.post("/api/v1/knowledge/", json=_SAMPLE_DOC, headers=_auth(token))
         doc_id = create_resp.json()["id"]
-
+        # Clear the login cookie so the next request is truly unauthenticated
+        client.cookies.clear()
         resp = client.put(f"/api/v1/knowledge/{doc_id}", json={"title": "未授权更新"})
         assert resp.status_code == 401
 
@@ -289,7 +294,8 @@ class TestDeleteKnowledge:
         token = _register_and_login(client, "delete_user3", "13400000003")
         create_resp = client.post("/api/v1/knowledge/", json=_SAMPLE_DOC, headers=_auth(token))
         doc_id = create_resp.json()["id"]
-
+        # Clear the login cookie so the next request is truly unauthenticated
+        client.cookies.clear()
         resp = client.delete(f"/api/v1/knowledge/{doc_id}")
         assert resp.status_code == 401
 
@@ -306,7 +312,8 @@ class TestDeleteKnowledge:
 
 class TestSearchKnowledge:
     def test_search_returns_list(self, client: TestClient):
-        resp = client.get("/api/v1/knowledge/search?q=水稻病害")
+        token = _register_and_login(client, "search_anon", "13500000099")
+        resp = client.get("/api/v1/knowledge/search?q=水稻病害", headers=_auth(token))
         assert resp.status_code == 200
         assert isinstance(resp.json(), list)
 
@@ -314,7 +321,7 @@ class TestSearchKnowledge:
         token = _register_and_login(client, "search_user1", "13500000001")
         client.post("/api/v1/knowledge/", json=_SAMPLE_DOC, headers=_auth(token))
 
-        resp = client.get("/api/v1/knowledge/search?q=水稻稻瘟病")
+        resp = client.get("/api/v1/knowledge/search?q=水稻稻瘟病", headers=_auth(token))
         assert resp.status_code == 200
         results = resp.json()
         assert len(results) >= 1
@@ -323,7 +330,7 @@ class TestSearchKnowledge:
         token = _register_and_login(client, "search_user2", "13500000002")
         client.post("/api/v1/knowledge/", json=_SAMPLE_DOC, headers=_auth(token))
 
-        resp = client.get("/api/v1/knowledge/search?q=稻瘟病防治")
+        resp = client.get("/api/v1/knowledge/search?q=稻瘟病防治", headers=_auth(token))
         assert resp.status_code == 200
         for item in resp.json():
             assert "id" in item
@@ -342,17 +349,19 @@ class TestSearchKnowledge:
             headers=_auth(token),
         )
 
-        resp = client.get("/api/v1/knowledge/search?q=防治&category=disease")
+        resp = client.get("/api/v1/knowledge/search?q=防治&category=disease", headers=_auth(token))
         assert resp.status_code == 200
         for item in resp.json():
             assert item["category"] == "disease"
 
     def test_search_requires_query_param(self, client: TestClient):
-        resp = client.get("/api/v1/knowledge/search")
+        token = _register_and_login(client, "search_user_noparam", "13500000098")
+        resp = client.get("/api/v1/knowledge/search", headers=_auth(token))
         assert resp.status_code == 422
 
     def test_search_empty_query_rejected(self, client: TestClient):
-        resp = client.get("/api/v1/knowledge/search?q=")
+        token = _register_and_login(client, "search_user_emptyq", "13500000097")
+        resp = client.get("/api/v1/knowledge/search?q=", headers=_auth(token))
         assert resp.status_code == 422
 
     def test_search_n_parameter(self, client: TestClient):
@@ -363,11 +372,11 @@ class TestSearchKnowledge:
                 json={**_SAMPLE_DOC, "title": f"搜索文档{i}"},
                 headers=_auth(token),
             )
-        resp = client.get("/api/v1/knowledge/search?q=水稻&n=2")
+        resp = client.get("/api/v1/knowledge/search?q=水稻&n=2", headers=_auth(token))
         assert resp.status_code == 200
         assert len(resp.json()) <= 2
 
-    def test_search_no_auth_required(self, client: TestClient):
-        """Search endpoint is public."""
+    def test_search_requires_auth(self, client: TestClient):
+        """Search endpoint now requires authentication."""
         resp = client.get("/api/v1/knowledge/search?q=水稻")
-        assert resp.status_code == 200
+        assert resp.status_code == 401

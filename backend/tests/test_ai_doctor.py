@@ -205,8 +205,8 @@ class TestDiagnoseStreamErrorResilience:
     Regression tests for ExceptionGroup: unhandled errors in a TaskGroup.
 
     When the underlying RAG stream raises a RuntimeError (e.g. LLM failure,
-    DB error), the SSE endpoint must return 200 and not let the exception
-    escape into sse_starlette's anyio task group.
+    DB error), the SSE endpoint must return 200 and emit a ``[ERROR]`` event
+    instead of letting the exception escape into sse_starlette's anyio task group.
     """
 
     def test_stream_no_exception_group_on_runtime_error(
@@ -214,7 +214,7 @@ class TestDiagnoseStreamErrorResilience:
     ):
         """
         Simulate a RuntimeError inside run_diagnosis_stream.
-        The endpoint must return 200 and not raise ExceptionGroup.
+        The endpoint must return 200, emit partial chunks, then emit [ERROR].
         """
         from unittest.mock import patch
 
@@ -238,8 +238,8 @@ class TestDiagnoseStreamErrorResilience:
         assert resp.status_code == 200
         # The partial chunk before the error should be in the body
         assert "first chunk" in resp.text
-        # The [DONE] sentinel will NOT appear because the exception cut
-        # streaming short — that is correct and expected behaviour.
+        # The [ERROR] sentinel must be emitted to the client
+        assert "[ERROR]" in resp.text
 
 
 class TestRecords:

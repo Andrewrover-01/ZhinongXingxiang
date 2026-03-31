@@ -197,8 +197,10 @@ class TestPolicySessions:
         )
         resp = client.get(f"/api/v1/policy/sessions/{session_id}", headers=_auth(token))
         assert resp.status_code == 200
-        messages = resp.json()
-        assert len(messages) >= 2  # user + assistant messages
+        data = resp.json()
+        messages = data["messages"]
+        assert data["total"] >= 2  # user + assistant messages
+        assert len(messages) >= 2
         roles = {m["role"] for m in messages}
         assert "user" in roles
         assert "assistant" in roles
@@ -211,10 +213,14 @@ class TestPolicySessions:
             json={"session_id": session_id, "message": "土地流转政策"},
             headers=_auth(token),
         )
-        messages = client.get(
+        data = client.get(
             f"/api/v1/policy/sessions/{session_id}", headers=_auth(token)
         ).json()
-        for m in messages:
+        assert "total" in data
+        assert "page" in data
+        assert "page_size" in data
+        assert "messages" in data
+        for m in data["messages"]:
             assert "id" in m
             assert "session_id" in m
             assert "role" in m
@@ -299,8 +305,8 @@ class TestPolicyChatStreamErrorResilience:
     Regression tests for ExceptionGroup: unhandled errors in a TaskGroup.
 
     When the underlying RAG stream raises a RuntimeError (e.g. LLM failure,
-    DB error), the SSE endpoint must return 200 and not let the exception
-    escape into sse_starlette's anyio task group.
+    DB error), the SSE endpoint must return 200 and emit a ``[ERROR]`` event
+    instead of letting the exception escape into sse_starlette's anyio task group.
     """
 
     def test_stream_no_exception_group_on_runtime_error(
@@ -308,7 +314,8 @@ class TestPolicyChatStreamErrorResilience:
     ):
         """
         Simulate a RuntimeError inside run_policy_chat_stream.
-        The endpoint must return 200 and not raise ExceptionGroup.
+        The endpoint must return 200, emit any partial chunks, then emit
+        [ERROR] and not raise ExceptionGroup.
         """
         from unittest.mock import patch
 
@@ -332,4 +339,148 @@ class TestPolicyChatStreamErrorResilience:
         assert resp.status_code == 200
         # The partial chunk before the error should be in the body
         assert "政策" in resp.text
+        # The [ERROR] sentinel must be emitted to the client
+        assert "[ERROR]" in resp.text
+
+
+# ── MED-004: Pagination tests ─────────────────────────────────────────────────
+
+class TestSessionPagination:
+    """MED-004 — GET /sessions/{session_id} must support page/page_size params."""
+
+    def _send_messages(self, client: TestClient, token: str, session_id: str, n: int):
+        for i in range(n):
+            client.post(
+                "/api/v1/policy/chat",
+                json={"session_id": session_id, "message": f"问题 {i}"},
+                headers=_auth(token),
+            )
+
+    def test_pagination_response_shape(self, client: TestClient):
+        token = _register_and_login(client, "page_user1", "15900000001")
+        session_id = _new_session_id()
+        self._send_messages(client, token, session_id, 2)  # 2 turns → 4 messages
+        data = client.get(
+            f"/api/v1/policy/sessions/{session_id}",
+            headers=_auth(token),
+        ).json()
+        assert "total" in data
+        assert "page" in data
+        assert "page_size" in data
+        assert "messages" in data
+        assert data["page"] == 1
+        assert data["page_size"] == 20
+
+    def test_page_size_limits_results(self, client: TestClient):
+        token = _register_and_login(client, "page_user2", "15900000002")
+        session_id = _new_session_id()
+        self._send_messages(client, token, session_id, 3)  # → 6 messages
+        data = client.get(
+            f"/api/v1/policy/sessions/{session_id}?page=1&page_size=2",
+            headers=_auth(token),
+        ).json()
+        assert len(data["messages"]) == 2
+        assert data["page_size"] == 2
+
+    def test_total_reflects_all_messages(self, client: TestClient):
+        token = _register_and_login(client, "page_user3", "15900000003")
+        session_id = _new_session_id()
+        self._send_messages(client, token, session_id, 2)  # → 4 messages
+        data = client.get(
+            f"/api/v1/policy/sessions/{session_id}?page_size=1",
+            headers=_auth(token),
+        ).json()
+        assert data["total"] >= 4  # 2 user + 2 assistant
+
+    def test_second_page_returns_different_messages(self, client: TestClient):
+        token = _register_and_login(client, "page_user4", "15900000004")
+        session_id = _new_session_id()
+        self._send_messages(client, token, session_id, 2)  # → 4 messages
+        page1 = client.get(
+            f"/api/v1/policy/sessions/{session_id}?page=1&page_size=2",
+            headers=_auth(token),
+        ).json()["messages"]
+        page2 = client.get(
+            f"/api/v1/policy/sessions/{session_id}?page=2&page_size=2",
+            headers=_auth(token),
+        ).json()["messages"]
+        ids_p1 = {m["id"] for m in page1}
+        ids_p2 = {m["id"] for m in page2}
+        assert ids_p1.isdisjoint(ids_p2), "Pages must not overlap"
+
+    def test_invalid_page_size_rejected(self, client: TestClient):
+        token = _register_and_login(client, "page_user5", "15900000005")
+        session_id = _new_session_id()
+        resp = client.get(
+            f"/api/v1/policy/sessions/{session_id}?page_size=0",
+            headers=_auth(token),
+        )
+        assert resp.status_code == 422
+
+    def test_page_size_above_max_rejected(self, client: TestClient):
+        token = _register_and_login(client, "page_user6", "15900000006")
+        session_id = _new_session_id()
+        resp = client.get(
+            f"/api/v1/policy/sessions/{session_id}?page_size=101",
+            headers=_auth(token),
+        )
+        assert resp.status_code == 422
+
+
+# ── MED-005: Global error handler tests ──────────────────────────────────────
+
+class TestGlobalErrorHandler:
+    """MED-005 — Unhandled server exceptions must not leak internal details."""
+
+    def test_unhandled_exception_returns_500_with_generic_message(
+        self, db, mock_chain
+    ):
+        from unittest.mock import patch
+        from app.core.database import get_db
+        from app.rag.chain import get_rag_chain
+
+        def override_db():
+            try:
+                yield db
+            finally:
+                pass
+
+        def override_chain():
+            return mock_chain
+
+        app.dependency_overrides[get_db] = override_db
+        app.dependency_overrides[get_rag_chain] = override_chain
+
+        token_client = TestClient(app)
+        resp = token_client.post(
+            "/api/v1/auth/register",
+            json={"username": "err_user1", "phone": "16000000001", "password": "testpass"},
+        )
+        resp = token_client.post(
+            "/api/v1/auth/login",
+            json={"username": "err_user1", "password": "testpass"},
+        )
+        token = resp.json()["access_token"]
+
+        with patch(
+            "app.routers.policy.list_sessions",
+            side_effect=RuntimeError("internal DB error details"),
+        ):
+            # raise_server_exceptions=False is required so the test client
+            # does not re-raise the server-side exception locally.
+            safe_client = TestClient(app, raise_server_exceptions=False)
+            resp = safe_client.get(
+                "/api/v1/policy/sessions",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+        app.dependency_overrides.clear()
+
+        assert resp.status_code == 500
+        body = resp.json()
+        # Must return a generic message
+        assert "detail" in body
+        # Must NOT expose internal error details
+        assert "internal DB error details" not in resp.text
+        assert "RuntimeError" not in resp.text
 

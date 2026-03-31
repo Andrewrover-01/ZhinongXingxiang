@@ -162,9 +162,20 @@ class VectorStore:
         where:
             ChromaDB ``where`` filter dict, e.g. ``{"category": "policy"}``.
         """
-        n = min(n_results, max(self._collection.count(), 1))
         if self._collection.count() == 0:
             return []
+
+        n = min(n_results, self._collection.count())
+
+        if where:
+            # ChromaDB raises an error when n_results exceeds the number of
+            # documents that match the where filter.  Pre-fetch up to n IDs
+            # to determine the actual filtered count and cap n accordingly.
+            filtered = self._collection.get(where=where, limit=n, include=[])
+            n = len(filtered["ids"])
+            if n == 0:
+                return []
+
         kwargs: Dict[str, Any] = {
             "query_texts": [query_text],
             "n_results": n,

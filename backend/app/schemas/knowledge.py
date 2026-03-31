@@ -1,17 +1,27 @@
 from __future__ import annotations
 
 from datetime import datetime
+from enum import Enum
 from typing import List, Optional
 
 from pydantic import BaseModel, Field
+
+
+# ── Category enum ─────────────────────────────────────────────────────────────
+
+class KnowledgeCategory(str, Enum):
+    disease = "disease"
+    policy = "policy"
+    technique = "technique"
+    pest = "pest"
+    weather = "weather"
 
 
 # ── Create / Update ───────────────────────────────────────────────────────────
 
 class KnowledgeCreate(BaseModel):
     title: str = Field(..., max_length=200)
-    # disease | policy | technique | pest | weather
-    category: str = Field(..., max_length=50)
+    category: KnowledgeCategory
     content: str
     source: Optional[str] = Field(None, max_length=200)
     crop_types: Optional[str] = None  # comma-separated, e.g. "水稻,小麦"
@@ -22,7 +32,7 @@ class KnowledgeCreate(BaseModel):
 
 class KnowledgeUpdate(BaseModel):
     title: Optional[str] = Field(None, max_length=200)
-    category: Optional[str] = Field(None, max_length=50)
+    category: Optional[KnowledgeCategory] = None
     content: Optional[str] = None
     source: Optional[str] = Field(None, max_length=200)
     crop_types: Optional[str] = None

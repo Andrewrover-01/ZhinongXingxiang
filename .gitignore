@@ -157,6 +157,9 @@ htmlcov/
 # Uploaded files (dev only)
 backend/uploads/
 
+# ChromaDB persistent data (dev only)
+backend/chroma_data/
+
 # Python virtual environments
 .venv/
 venv/

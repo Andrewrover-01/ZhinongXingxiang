@@ -25,8 +25,8 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       await authApi.register(form);
-      const res = await authApi.login({ username: form.username, password: form.password });
-      localStorage.setItem("access_token", res.access_token);
+      await authApi.login({ username: form.username, password: form.password });
+      // Token is stored in an httpOnly cookie set by the server — no localStorage needed
       router.push("/farmland");
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;

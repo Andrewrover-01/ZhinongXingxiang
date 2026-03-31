@@ -331,9 +331,6 @@ export default function AiDoctorPage() {
     setStreamText("");
     setStreaming(true);
 
-    const token =
-      typeof window !== "undefined" ? localStorage.getItem("access_token") ?? "" : "";
-
     const payload = {
       image_url: imageUrl || previewUrl || "https://example.com/placeholder.jpg",
       description: description || undefined,
@@ -342,8 +339,8 @@ export default function AiDoctorPage() {
     };
 
     try {
-      // Try streaming first
-      const reader = streamDiagnose(payload, token);
+      // Try streaming first — auth cookie is sent automatically
+      const reader = streamDiagnose(payload);
       const decoder = new TextDecoder();
       let accumulated = "";
 
@@ -357,6 +354,11 @@ export default function AiDoctorPage() {
           if (line.startsWith("data: ")) {
             const data = line.slice(6).trim();
             if (data === "[DONE]") break;
+            if (data === "[ERROR]") {
+              setStreaming(false);
+              setError("诊断服务出现问题，请稍后重试");
+              return;
+            }
             accumulated += data;
             setStreamText(accumulated);
           }

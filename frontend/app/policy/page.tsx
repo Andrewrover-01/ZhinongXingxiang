@@ -158,11 +158,6 @@ export default function PolicyPage() {
       if (!msgText || isStreaming) return;
       setInputText("");
 
-      const token =
-        typeof window !== "undefined"
-          ? localStorage.getItem("access_token") ?? ""
-          : "";
-
       // Optimistically add user message
       const userMsg: PolicyMessage = {
         id: `temp-${Date.now()}`,
@@ -186,7 +181,7 @@ export default function PolicyPage() {
       setIsStreaming(true);
 
       try {
-        const reader = streamPolicyChat(currentSessionId, msgText, token);
+        const reader = streamPolicyChat(currentSessionId, msgText);
         const decoder = new TextDecoder();
         let accumulated = "";
 
@@ -199,6 +194,20 @@ export default function PolicyPage() {
             if (line.startsWith("data: ")) {
               const data = line.slice(6).trim();
               if (data === "[DONE]") break;
+              if (data === "[ERROR]") {
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantMsgId
+                      ? {
+                          ...m,
+                          content:
+                            accumulated || "⚠️ 服务出现问题，请稍后重试",
+                        }
+                      : m
+                  )
+                );
+                break;
+              }
               accumulated += data;
               setMessages((prev) =>
                 prev.map((m) =>

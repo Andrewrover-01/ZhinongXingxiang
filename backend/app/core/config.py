@@ -1,5 +1,8 @@
 from typing import Optional
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_WEAK_DEFAULT_SECRET = "dev-secret-key-change-in-production"
 
 
 class Settings(BaseSettings):
@@ -11,9 +14,9 @@ class Settings(BaseSettings):
     # Cache TTL in seconds.  Default: 1 hour (3600 s) for RAG results.
     CACHE_TTL: int = 3600
 
-    SECRET_KEY: str = "dev-secret-key-change-in-production"
+    SECRET_KEY: str = _WEAK_DEFAULT_SECRET  # Must be overridden via SECRET_KEY env var in production
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080  # 7 days
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60  # 1 hour; use shorter TTL to limit stolen-token exposure
 
     UPLOAD_DIR: str = "./uploads"
     MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024  # 10 MB
@@ -25,6 +28,28 @@ class Settings(BaseSettings):
     CHROMA_EMBEDDING_BACKEND: str = "default"  # default | openai | mock
     OPENAI_API_KEY: Optional[str] = None
     QWEN_API_KEY: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _validate_settings(self) -> "Settings":
+        # Treat blank strings (e.g. unset docker-compose variables) as None
+        if not self.OPENAI_API_KEY:
+            self.OPENAI_API_KEY = None
+        if not self.QWEN_API_KEY:
+            self.QWEN_API_KEY = None
+
+        # Enforce strong configuration in production
+        if self.APP_ENV == "production" and self.SECRET_KEY == _WEAK_DEFAULT_SECRET:
+            raise ValueError(
+                "SECRET_KEY must be set to a strong random value in production. "
+                "Set the SECRET_KEY environment variable to at least 32 random bytes."
+            )
+        if self.APP_ENV == "production" and self.DATABASE_URL.startswith("sqlite"):
+            raise ValueError(
+                "SQLite is not suitable for production use. "
+                "Set the DATABASE_URL environment variable to a PostgreSQL or other "
+                "production-grade database connection string."
+            )
+        return self
 
 
 settings = Settings()

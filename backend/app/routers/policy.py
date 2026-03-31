@@ -9,13 +9,11 @@ GET    /policy/sessions/{session_id} get all messages in a session
 DELETE /policy/sessions/{session_id} delete a session
 """
 
-from __future__ import annotations
-
 import json
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sse_starlette.sse import EventSourceResponse  # type: ignore
@@ -23,6 +21,7 @@ from sse_starlette.sse import EventSourceResponse  # type: ignore
 _log = logging.getLogger(__name__)
 
 from app.core.database import get_db
+from app.core.limiter import limiter
 from app.models.user import User
 from app.rag.chain import RAGChain, get_rag_chain
 from app.routers.deps import get_current_user
@@ -40,7 +39,9 @@ router = APIRouter(prefix="/policy", tags=["Policy Assistant"])
 # ── Chat ──────────────────────────────────────────────────────────────────────
 
 @router.post("/chat")
+@limiter.limit("20/minute")
 async def policy_chat(
+    request: Request,
     req: PolicyChatRequest,
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
@@ -51,6 +52,7 @@ async def policy_chat(
 
     The response is Server-Sent Events; each event has ``data: <chunk>``.
     A final ``data: [DONE]`` event signals stream completion.
+    A ``data: [ERROR]`` event is emitted if the stream fails mid-way.
     """
 
     async def _event_generator():
@@ -65,11 +67,11 @@ async def policy_chat(
                 yield {"data": chunk}
             yield {"data": "[DONE]"}
         except Exception as exc:
-            # Swallow the exception so it does not propagate into
-            # sse_starlette's anyio task-group and become an ExceptionGroup.
-            # asyncio.CancelledError is a BaseException (not Exception) so it
-            # is still re-raised, letting anyio handle normal cancellation.
+            # Signal the client that an error occurred, then swallow the
+            # exception so it does not propagate into sse_starlette's anyio
+            # task group and become an ExceptionGroup.
             _log.warning("SSE policy chat stream error: %s", exc, exc_info=True)
+            yield {"data": "[ERROR]"}
 
     return EventSourceResponse(_event_generator())
 
@@ -89,21 +91,28 @@ def get_session(
     session_id: str,
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    page: int = Query(1, ge=1, description="页码（从 1 开始）"),
+    page_size: int = Query(20, ge=1, le=100, description="每页消息数（最大 100）"),
 ):
-    messages = get_session_messages(db, session_id, current_user.id)
-    if not messages:
+    messages, total = get_session_messages(db, session_id, current_user.id, page, page_size)
+    if total == 0:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="会话不存在")
-    return [
-        {
-            "id": m.id,
-            "session_id": m.session_id,
-            "role": m.role,
-            "content": m.content,
-            "rag_sources": m.rag_sources,
-            "created_at": m.created_at.isoformat(),
-        }
-        for m in messages
-    ]
+    return {
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "messages": [
+            {
+                "id": m.id,
+                "session_id": m.session_id,
+                "role": m.role,
+                "content": m.content,
+                "rag_sources": m.rag_sources,
+                "created_at": m.created_at.isoformat(),
+            }
+            for m in messages
+        ],
+    }
 
 
 @router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)

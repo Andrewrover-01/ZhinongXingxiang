@@ -1,32 +1,22 @@
+import asyncio
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+
+_log = logging.getLogger(__name__)
 
 from app.core.cache import close_redis
 from app.core.config import settings
 from app.core.database import create_tables
-from app.routers.auth import router as auth_router
-from app.routers.farmland import router as farmland_router
-from app.routers.upload import router as upload_router
-from app.routers.users import router as users_router
-from app.routers.knowledge import router as knowledge_router
-from app.routers.ai_doctor import router as ai_doctor_router
-from app.routers.policy import router as policy_router
-
-
-from contextlib import asynccontextmanager
-from pathlib import Path
-
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-
-from app.core.cache import close_redis
-from app.core.config import settings
-from app.core.database import create_tables
+from app.core.limiter import limiter  # noqa: F401 — re-exported for convenience
+from app.rag.vector_store import get_vector_store
 from app.routers.auth import router as auth_router
 from app.routers.farmland import router as farmland_router
 from app.routers.upload import router as upload_router
@@ -42,6 +32,16 @@ async def lifespan(app: FastAPI):
     Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
     # Auto-create tables for SQLite / development
     create_tables()
+
+    # Pre-warm the VectorStore so the embedding model (ONNX, ~79 MB) is
+    # downloaded and loaded at startup rather than blocking the first user
+    # query.  This avoids an unexpected long delay (or timeout) on the first
+    # request after the knowledge base has been ingested.
+    try:
+        await asyncio.get_event_loop().run_in_executor(None, get_vector_store)
+        _log.info("VectorStore pre-warmed successfully.")
+    except Exception as exc:  # noqa: BLE001 — catch all: startup must never fail due to VS issues
+        _log.warning("VectorStore pre-warm failed (will retry on first query): %s", exc)
 
     # Reset sse_starlette's AppStatus.should_exit_event so it is always
     # created inside the current event loop.  Without this, the module-level
@@ -68,12 +68,27 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# ── Rate limiting ─────────────────────────────────────────────────────────────
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
+
+
+@app.exception_handler(Exception)
+async def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Catch-all handler: log the real error server-side but return a generic
+    message to the client so that internal details are never leaked."""
+    _log.error("Unhandled exception on %s %s", request.method, request.url, exc_info=exc)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "服务器内部错误，请稍后重试。"},
+    )
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 app.include_router(auth_router, prefix="/api/v1")

@@ -116,6 +116,19 @@ class TestVectorStore:
         for r in results:
             assert r.metadata.get("category") == "disease"
 
+    def test_query_where_filter_n_results_exceeds_filtered_count(self, populated_vs: VectorStore):
+        # populated_vs has only 1 "policy" document (doc4), but n_results=20.
+        # ChromaDB would raise an error if we don't cap n_results to filtered count.
+        results = populated_vs.query("补贴政策", n_results=20, where={"category": "policy"})
+        assert isinstance(results, list)
+        assert len(results) == 1
+        assert results[0].metadata.get("category") == "policy"
+
+    def test_query_where_filter_no_match_returns_empty(self, populated_vs: VectorStore):
+        # No documents have category "weather" in the fixture.
+        results = populated_vs.query("天气预报", n_results=5, where={"category": "weather"})
+        assert results == []
+
     def test_query_empty_store_returns_empty(self, vs: VectorStore):
         results = vs.query("任意查询", n_results=5)
         assert results == []
