@@ -194,6 +194,20 @@ export default function PolicyPage() {
             if (line.startsWith("data: ")) {
               const data = line.slice(6).trim();
               if (data === "[DONE]") break;
+              if (data === "[ERROR]") {
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantMsgId
+                      ? {
+                          ...m,
+                          content:
+                            accumulated || "⚠️ 服务出现问题，请稍后重试",
+                        }
+                      : m
+                  )
+                );
+                break;
+              }
               accumulated += data;
               setMessages((prev) =>
                 prev.map((m) =>
