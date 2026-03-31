@@ -41,7 +41,8 @@ services:
       ALGORITHM: HS256
       ACCESS_TOKEN_EXPIRE_MINUTES: 10080
       UPLOAD_DIR: /app/uploads
-      CORS_ORIGINS: '["http://localhost:3000","http://frontend:3000"]'
+      # 注意：CORS 允许前端 3001 端口访问
+      CORS_ORIGINS: '["http://localhost:3000","http://localhost:3001"]'
       CHROMA_PERSIST_DIR: /app/chroma_data
     volumes:
       - uploads_data:/app/uploads
@@ -61,10 +62,11 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: http://localhost:8000
+        # 这里的地址非常关键，必须是外部能访问到的后端地址
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     restart: unless-stopped
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     ports:
       - "3001:3000"
     depends_on:
