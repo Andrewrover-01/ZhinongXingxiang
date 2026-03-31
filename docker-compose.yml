@@ -44,6 +44,7 @@ services:
       CORS_ORIGINS: '["http://localhost:3000","http://frontend:3000"]'
     volumes:
       - uploads_data:/app/uploads
+      - chroma_data:/app/chroma_data  # <--- 增加这一行，把知识库映射出来
     ports:
       - "8000:8000"
     depends_on:
@@ -71,3 +72,4 @@ volumes:
   postgres_data:
   redis_data:
   uploads_data:
+  chroma_data:  # <--- 增加这一行，声明这个卷
