@@ -354,6 +354,11 @@ export default function AiDoctorPage() {
           if (line.startsWith("data: ")) {
             const data = line.slice(6).trim();
             if (data === "[DONE]") break;
+            if (data === "[ERROR]") {
+              setStreaming(false);
+              setError("诊断服务出现问题，请稍后重试");
+              return;
+            }
             accumulated += data;
             setStreamText(accumulated);
           }
