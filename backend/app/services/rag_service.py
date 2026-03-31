@@ -243,16 +243,21 @@ def get_session_messages(
     db: Session,
     session_id: str,
     user_id: str,
-) -> List[PolicyChatHistory]:
-    return (
+    page: int = 1,
+    page_size: int = 20,
+) -> tuple[List[PolicyChatHistory], int]:
+    """Return a paginated list of messages and the total count."""
+    query = (
         db.query(PolicyChatHistory)
         .filter(
             PolicyChatHistory.session_id == session_id,
             PolicyChatHistory.user_id == user_id,
         )
         .order_by(PolicyChatHistory.created_at)
-        .all()
     )
+    total = query.count()
+    messages = query.offset((page - 1) * page_size).limit(page_size).all()
+    return messages, total
 
 
 def list_sessions(db: Session, user_id: str) -> List[Dict[str, Any]]:

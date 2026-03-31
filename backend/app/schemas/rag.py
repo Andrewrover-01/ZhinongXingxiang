@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import re
+from enum import Enum
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 # ── Shared source reference ───────────────────────────────────────────────────
@@ -18,10 +20,18 @@ class RAGSourceOut(BaseModel):
 # ── AI Doctor ─────────────────────────────────────────────────────────────────
 
 class DiagnoseRequest(BaseModel):
-    image_url: str = Field(..., description="已上传图片的 URL 或相对路径")
-    description: Optional[str] = Field(None, description="用户文字描述（可选）")
+    image_url: str = Field(..., max_length=500, description="已上传图片的 URL 或相对路径")
+    description: Optional[str] = Field(None, max_length=1000, description="用户文字描述（可选）")
     crop_type: Optional[str] = Field(None, max_length=100)
     farmland_id: Optional[str] = None
+
+    @field_validator("image_url")
+    @classmethod
+    def validate_image_url(cls, v: str) -> str:
+        # Allow only relative upload paths or http(s) URLs; block SSRF via other schemes
+        if not (v.startswith("/upload/images/") or re.match(r"^https?://", v)):
+            raise ValueError("image_url 必须是 /upload/images/ 路径或 http(s) URL")
+        return v
 
 
 class DiagnoseResponse(BaseModel):

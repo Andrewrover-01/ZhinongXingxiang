@@ -331,9 +331,6 @@ export default function AiDoctorPage() {
     setStreamText("");
     setStreaming(true);
 
-    const token =
-      typeof window !== "undefined" ? localStorage.getItem("access_token") ?? "" : "";
-
     const payload = {
       image_url: imageUrl || previewUrl || "https://example.com/placeholder.jpg",
       description: description || undefined,
@@ -342,8 +339,8 @@ export default function AiDoctorPage() {
     };
 
     try {
-      // Try streaming first
-      const reader = streamDiagnose(payload, token);
+      // Try streaming first — auth cookie is sent automatically
+      const reader = streamDiagnose(payload);
       const decoder = new TextDecoder();
       let accumulated = "";
 

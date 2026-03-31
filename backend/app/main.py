@@ -1,32 +1,20 @@
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+
+_log = logging.getLogger(__name__)
 
 from app.core.cache import close_redis
 from app.core.config import settings
 from app.core.database import create_tables
-from app.routers.auth import router as auth_router
-from app.routers.farmland import router as farmland_router
-from app.routers.upload import router as upload_router
-from app.routers.users import router as users_router
-from app.routers.knowledge import router as knowledge_router
-from app.routers.ai_doctor import router as ai_doctor_router
-from app.routers.policy import router as policy_router
-
-
-from contextlib import asynccontextmanager
-from pathlib import Path
-
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-
-from app.core.cache import close_redis
-from app.core.config import settings
-from app.core.database import create_tables
+from app.core.limiter import limiter  # noqa: F401 — re-exported for convenience
 from app.routers.auth import router as auth_router
 from app.routers.farmland import router as farmland_router
 from app.routers.upload import router as upload_router
@@ -68,12 +56,27 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# ── Rate limiting ─────────────────────────────────────────────────────────────
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
+
+
+@app.exception_handler(Exception)
+async def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Catch-all handler: log the real error server-side but return a generic
+    message to the client so that internal details are never leaked."""
+    _log.error("Unhandled exception on %s %s", request.method, request.url, exc_info=exc)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "服务器内部错误，请稍后重试。"},
+    )
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 app.include_router(auth_router, prefix="/api/v1")

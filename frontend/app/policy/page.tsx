@@ -158,11 +158,6 @@ export default function PolicyPage() {
       if (!msgText || isStreaming) return;
       setInputText("");
 
-      const token =
-        typeof window !== "undefined"
-          ? localStorage.getItem("access_token") ?? ""
-          : "";
-
       // Optimistically add user message
       const userMsg: PolicyMessage = {
         id: `temp-${Date.now()}`,
@@ -186,7 +181,7 @@ export default function PolicyPage() {
       setIsStreaming(true);
 
       try {
-        const reader = streamPolicyChat(currentSessionId, msgText, token);
+        const reader = streamPolicyChat(currentSessionId, msgText);
         const decoder = new TextDecoder();
         let accumulated = "";
 

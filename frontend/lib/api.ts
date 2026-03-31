@@ -5,25 +5,22 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 export const apiClient = axios.create({
   baseURL: `${API_BASE}/api/v1`,
   headers: { "Content-Type": "application/json" },
+  withCredentials: true, // send httpOnly auth cookie automatically
 });
 
-// Attach JWT token to every request
-apiClient.interceptors.request.use((config) => {
-  if (typeof window !== "undefined") {
-    const token = localStorage.getItem("access_token");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-  }
-  return config;
-});
-
-// Auto-redirect on 401
+// Auto-redirect on 401 and call logout to clear the server-side cookie
 apiClient.interceptors.response.use(
   (res) => res,
-  (error) => {
+  async (error) => {
     if (error.response?.status === 401 && typeof window !== "undefined") {
-      localStorage.removeItem("access_token");
+      // Attempt to clear the httpOnly cookie via the logout endpoint
+      try {
+        await axios.post(`${API_BASE}/api/v1/auth/logout`, null, {
+          withCredentials: true,
+        });
+      } catch {
+        // ignore — redirect regardless
+      }
       window.location.href = "/login";
     }
     return Promise.reject(error);
@@ -71,6 +68,7 @@ export const authApi = {
   register: (data: RegisterPayload) =>
     apiClient.post<UserResponse>("/auth/register", data).then((r) => r.data),
   me: () => apiClient.get<UserResponse>("/auth/me").then((r) => r.data),
+  logout: () => apiClient.post("/auth/logout"),
 };
 
 // ─── Farmland ───────────────────────────────────────────────────────────────
@@ -186,8 +184,7 @@ export const aiDoctorApi = {
 
 /** Open an SSE stream for AI Doctor streaming diagnosis. Returns a Reader. */
 export function streamDiagnose(
-  data: DiagnoseRequest,
-  token: string
+  data: DiagnoseRequest
 ): ReadableStreamDefaultReader<Uint8Array> {
   const ctrl = new AbortController();
   const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -195,17 +192,20 @@ export function streamDiagnose(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
     },
+    credentials: "include", // send httpOnly auth cookie
     body: JSON.stringify(data),
     signal: ctrl.signal,
   });
-  // Return a reader-like wrapper by building a ReadableStream from the fetch
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
         const res = await resp;
-        const reader = res.body!.getReader();
+        if (!res.body) {
+          controller.error(new Error("Empty response body"));
+          return;
+        }
+        const reader = res.body.getReader();
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
@@ -253,8 +253,7 @@ export const policyApi = {
 /** Open an SSE stream for Policy chat. Returns a ReadableStreamDefaultReader. */
 export function streamPolicyChat(
   sessionId: string,
-  message: string,
-  token: string
+  message: string
 ): ReadableStreamDefaultReader<Uint8Array> {
   const ctrl = new AbortController();
   const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -265,12 +264,16 @@ export function streamPolicyChat(
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
           },
+          credentials: "include", // send httpOnly auth cookie
           body: JSON.stringify({ session_id: sessionId, message }),
           signal: ctrl.signal,
         });
-        const reader = res.body!.getReader();
+        if (!res.body) {
+          controller.error(new Error("Empty response body"));
+          return;
+        }
+        const reader = res.body.getReader();
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
