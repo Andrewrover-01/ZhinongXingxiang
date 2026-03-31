@@ -1,0 +1,38 @@
+# Never bake secrets into the image
+.env
+.env.*
+!.env.example
+
+# Python byte-code and caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.eggs/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Test artifacts
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
+
+# Dev databases (use the postgres service defined in docker-compose)
+*.db
+
+# Uploaded files (mounted as a named volume at runtime)
+uploads/
+
+# ChromaDB persistent data (mounted as a named volume at runtime)
+chroma_data/
+
+# Load-test artifacts
+load_test_results*.csv
+.locust_client_id

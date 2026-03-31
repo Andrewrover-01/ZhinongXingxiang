@@ -42,8 +42,11 @@ services:
       ACCESS_TOKEN_EXPIRE_MINUTES: 10080
       UPLOAD_DIR: /app/uploads
       CORS_ORIGINS: '["http://localhost:3000","http://frontend:3000"]'
+      CHROMA_PERSIST_DIR: /app/chroma_data
     volumes:
       - uploads_data:/app/uploads
+      - chroma_data:/app/chroma_data
+      - onnx_cache:/root/.cache/chroma
     ports:
       - "8000:8000"
     depends_on:
@@ -71,3 +74,5 @@ volumes:
   postgres_data:
   redis_data:
   uploads_data:
+  chroma_data:
+  onnx_cache:
