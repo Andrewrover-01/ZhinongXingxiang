@@ -21,7 +21,7 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      const res = await authApi.login({ username, password });
+      await authApi.login({ username, password });
       // Token is stored in an httpOnly cookie set by the server — no localStorage needed
       router.push("/farmland");
     } catch (err: unknown) {
