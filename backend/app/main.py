@@ -1,11 +1,15 @@
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+
+_log = logging.getLogger(__name__)
 
 from app.core.cache import close_redis
 from app.core.config import settings
@@ -55,6 +59,17 @@ app = FastAPI(
 # ── Rate limiting ─────────────────────────────────────────────────────────────
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
+
+
+@app.exception_handler(Exception)
+async def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Catch-all handler: log the real error server-side but return a generic
+    message to the client so that internal details are never leaked."""
+    _log.error("Unhandled exception on %s %s", request.method, request.url, exc_info=exc)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "服务器内部错误，请稍后重试。"},
+    )
 
 app.add_middleware(
     CORSMiddleware,

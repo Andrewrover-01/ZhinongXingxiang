@@ -138,6 +138,7 @@ def test_strong_secret_key_accepted_in_production():
     try:
         os.environ["APP_ENV"] = "production"
         os.environ["SECRET_KEY"] = "a-very-strong-random-key-for-testing-purposes-only"
+        os.environ["DATABASE_URL"] = "postgresql://user:pass@localhost/testdb"
         from app.core.config import Settings
         s = Settings()
         assert s.SECRET_KEY == "a-very-strong-random-key-for-testing-purposes-only"

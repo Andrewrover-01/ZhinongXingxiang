@@ -13,7 +13,7 @@ import json
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sse_starlette.sse import EventSourceResponse  # type: ignore
@@ -91,21 +91,28 @@ def get_session(
     session_id: str,
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    page: int = Query(1, ge=1, description="页码（从 1 开始）"),
+    page_size: int = Query(20, ge=1, le=100, description="每页消息数（最大 100）"),
 ):
-    messages = get_session_messages(db, session_id, current_user.id)
-    if not messages:
+    messages, total = get_session_messages(db, session_id, current_user.id, page, page_size)
+    if total == 0:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="会话不存在")
-    return [
-        {
-            "id": m.id,
-            "session_id": m.session_id,
-            "role": m.role,
-            "content": m.content,
-            "rag_sources": m.rag_sources,
-            "created_at": m.created_at.isoformat(),
-        }
-        for m in messages
-    ]
+    return {
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "messages": [
+            {
+                "id": m.id,
+                "session_id": m.session_id,
+                "role": m.role,
+                "content": m.content,
+                "rag_sources": m.rag_sources,
+                "created_at": m.created_at.isoformat(),
+            }
+            for m in messages
+        ],
+    }
 
 
 @router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)

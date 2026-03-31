@@ -36,6 +36,12 @@ class Settings(BaseSettings):
                 "SECRET_KEY must be set to a strong random value in production. "
                 "Set the SECRET_KEY environment variable to at least 32 random bytes."
             )
+        if self.APP_ENV == "production" and self.DATABASE_URL.startswith("sqlite"):
+            raise ValueError(
+                "SQLite is not suitable for production use. "
+                "Set the DATABASE_URL environment variable to a PostgreSQL or other "
+                "production-grade database connection string."
+            )
         return self
 
 
